@@ -1,0 +1,9 @@
+Locations: /home/vr/github/orange/python
+first line :/* SDSLib 2.0 -- A C dynamic strings library
+Locations: /home/vr/github/orange/pythonfirst line :/* SDSLib 2.0 -- A C dynamic strings library
+Locations: /home/vr/github/orange/python
+first line :/* SDSLib 2.0 -- A C dynamic strings library
+Locations: /home/vr/github/orange/python
+first line :/* SDSLib 2.0 -- A C dynamic strings library
+Locations: /home/vr/github/orange/python
+first line :/* SDSLib 2.0 -- A C dynamic strings library
