@@ -11,4 +11,7 @@
 #include "log.h"
 #define UTILLOGLEVEL 1
 
-int createlisten(int port);
+#define UTILNET_ERROR  -1
+
+int tcpGenericServer(int port);
+int tcpGenericConnect(const char *source_addr,int port,const char *dest_ip,int dest_port);
