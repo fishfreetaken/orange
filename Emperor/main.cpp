@@ -15,6 +15,8 @@ int main()
     printf("success create server fd: %d\n",fd);
     char buf[32]={0};
 
+    std::vector<int> vecclient;
+
     struct sockaddr m;
     socklen_t flag=1;
     int count=0;
@@ -42,10 +44,25 @@ int main()
         snprintf(buf,32,"this is server!");
         write(tfd,buf,32);
         
-        close(tfd);
+        
+        //close(tfd);
         count++;
         LOG::record(UTILNET_ERROR,"__LINE__ accept count:%d",count);
+
+        vecclient.push_back(tfd);
+        if(count==2)
+        {
+            break;
+        }
     }
+    
+
+
+    for (auto i :vecclient)
+    {
+        close(i);
+    }
+
 
     close(fd);
     

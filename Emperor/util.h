@@ -9,6 +9,9 @@
 #include <netdb.h>
 #include <fcntl.h>
 #include "log.h"
+
+#include <vector>
+
 #define UTILLOGLEVEL 1
 
 #define UTILNET_ERROR  -1

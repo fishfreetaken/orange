@@ -26,6 +26,12 @@ int main()
     }
     printf("r:%d this is received from %s\n",r,buf);
 
+
+    while(1)
+    {
+        
+    }
+
     close(fd);
     return 0;
 }
