@@ -26,4 +26,4 @@ $(SUM_CLIENT_NAME): $(SUM_CLIENT_OBJ)
 
 .PHONY : clean
 clean:
-	rm  -rf $(SUM_SERVER_OBJ)
+	rm  -rf $(SUM_SERVER_OBJ) clientmain.o

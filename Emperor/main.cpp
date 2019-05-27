@@ -16,7 +16,7 @@ int main()
     char buf[32]={0};
 
     struct sockaddr m;
-    socklen_t flag;
+    socklen_t flag=1;
     int count=0;
     while(1)
     {
@@ -37,8 +37,11 @@ int main()
         {
             LOG::record(UTILNET_ERROR,"__LINE__ read:%s",strerror(errno));
         }
-        printf("receive: %s",buf);
+        printf("rlen:%d receive: %s\n",rlen,buf);
         memset(buf,0,32);
+        snprintf(buf,32,"this is server!");
+        write(tfd,buf,32);
+        
         close(tfd);
         count++;
         LOG::record(UTILNET_ERROR,"__LINE__ accept count:%d",count);
