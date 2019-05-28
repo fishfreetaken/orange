@@ -8,13 +8,16 @@
 #include <unistd.h>
 #include <netdb.h>
 #include <fcntl.h>
+#include <iostream>
 #include "log.h"
 
 #include <vector>
 
-#define UTILLOGLEVEL 1
+#define UTILLOGLEVEL1 1
 
+#define UTILNET_SUCCESS  0
 #define UTILNET_ERROR  -1
 
-int tcpGenericServer(int port);
+int tcpGenericServer(const char *source_addr,int port);
 int tcpGenericConnect(const char *source_addr,int port,const char *dest_ip,int dest_port);
+void setNonBlock(int socket_fd);
