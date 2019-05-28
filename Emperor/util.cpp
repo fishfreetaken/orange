@@ -5,13 +5,18 @@ int setResusedConfig(int socket_fd)
 {
     int yes;
     if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1) {
-        LOG::record( UTILLOGLEVEL,"setsockopt SO_REUSEADDR: %s", strerror(errno));
+        LOG::record( UTILLOGLEVEL1,"setsockopt SO_REUSEADDR: %s", strerror(errno));
         return -1;
     }
     return 0;
 }
 
-int tcpGenericServer(int port)
+void setNonBlock(int socket_fd)
+{
+    fcntl(socket_fd, F_SETFL, fcntl(socket_fd, F_GETFL) | O_NONBLOCK);
+}
+
+int tcpGenericServer(const char *source_addr,int port)
 {
     char _port[6];
     struct addrinfo hints,*servinfo;
@@ -22,7 +27,7 @@ int tcpGenericServer(int port)
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
 
-    if (getaddrinfo("localhost",_port,&hints,&servinfo) <0 ) {
+    if (getaddrinfo(source_addr,_port,&hints,&servinfo) <0 ) {
         LOG::record(1, "%s", strerror(errno));
         return -1;
     }
@@ -30,7 +35,7 @@ int tcpGenericServer(int port)
     int socket_fd=socket(servinfo->ai_family,servinfo->ai_socktype,servinfo->ai_protocol);
     if(socket_fd ==-1 )
     {
-        LOG::record(UTILLOGLEVEL,"socket create : %s",strerror(errno));
+        LOG::record(UTILLOGLEVEL1,"socket create : %s",strerror(errno));
         goto error;
     }
 
@@ -39,16 +44,16 @@ int tcpGenericServer(int port)
         goto error;
     }
     
-    //fcntl(socket_fd, F_SETFL, fcntl(socket_fd, F_GETFL) | O_NONBLOCK);
+    //setNonBlock(socket_fd);
 
     if(bind(socket_fd,servinfo->ai_addr,servinfo->ai_addrlen)==-1)
     {
-        LOG::record( UTILLOGLEVEL,"bind : %s", strerror(errno));
+        LOG::record( UTILLOGLEVEL1,"bind : %s", strerror(errno));
         goto error;
     }
     
     if (listen(socket_fd, 15) == -1) {
-        LOG::record(UTILLOGLEVEL, "listen: %s", strerror(errno));
+        LOG::record(UTILLOGLEVEL1, "listen: %s", strerror(errno));
         goto error;
     }
 
@@ -76,13 +81,13 @@ int tcpGenericConnect(const char *source_addr,int port,const char *dest_ip,int d
     hints.ai_socktype = SOCK_STREAM;
 
     if (getaddrinfo(dest_ip,portstr,&hints,&servinfo) != 0) {
-        LOG::record(UTILLOGLEVEL, "getaddrinfo: %s", strerror(errno));
+        LOG::record(UTILLOGLEVEL1, "getaddrinfo: %s", strerror(errno));
         return UTILNET_ERROR;
     }
     int socket_fd;
     if ((socket_fd = socket(servinfo->ai_family,servinfo->ai_socktype,servinfo->ai_protocol)) == -1)
     {
-        LOG::record(UTILLOGLEVEL, "clinet socket: %s", strerror(errno));
+        LOG::record(UTILLOGLEVEL1, "clinet socket: %s", strerror(errno));
         goto error;
     }
 
@@ -106,11 +111,11 @@ int tcpGenericConnect(const char *source_addr,int port,const char *dest_ip,int d
         hints.ai_flags = AI_PASSIVE;
         if (getaddrinfo(source_addr, srcport, &hints, &bservinfo) != 0)
         {
-            LOG::record(UTILLOGLEVEL, "source_addr getaddrinfo: %s", strerror(errno));
+            LOG::record(UTILLOGLEVEL1, "source_addr getaddrinfo: %s", strerror(errno));
             goto error;
         }
         if(bind(socket_fd,bservinfo->ai_addr,bservinfo->ai_addrlen)!=-1){
-            LOG::record(UTILLOGLEVEL, "source_addr bind: %s", strerror(errno));
+            LOG::record(UTILLOGLEVEL1, "source_addr bind: %s", strerror(errno));
         }
     }
 
@@ -122,7 +127,7 @@ int tcpGenericConnect(const char *source_addr,int port,const char *dest_ip,int d
         }else{
             goto error;
         }
-        LOG::record(UTILLOGLEVEL, "connect: %s", strerror(errno));
+        LOG::record(UTILLOGLEVEL1, "connect: %s", strerror(errno));
     }
     goto end;
 error:
