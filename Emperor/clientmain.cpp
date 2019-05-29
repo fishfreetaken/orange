@@ -1,35 +1,72 @@
 #include "util.h"
+#define TMPBUFFERLEN 100
+
+void threadRead(int fd)
+{
+    char buf[TMPBUFFERLEN];
+    int r=0;
+    printf("Hello thread read!\n");
+    while(1)
+    {
+        memset(buf,0,TMPBUFFERLEN);
+        //printf("Please input you want to send to server:");
+        std::cin.getline(buf,TMPBUFFERLEN);
+        //scanf("%s",buf);
+        do{
+             r=write(fd,buf,strlen(buf));
+            if(r < 0)
+            {
+                LOG::record(UTILLOGLEVEL1, "write %d : %s\n", __LINE__,strerror(errno));
+            }
+        }while(0);
+        
+        if(strcmp(buf,"over")==0)
+        {
+            printf("skip the while\n");
+            break;
+        }
+        printf("len:%d local to other:\n%s\n",r,buf);
+    }
+    printf("threadRead over!");
+}
 
 int main()
 {
     int port =8889;
-    int fd=tcpGenericConnect("localhost",port,"localhost",8888);
+    int fd=tcpGenericConnect(NULL,port,"10.8.49.62",8888);
     if(fd < 0)
     {
-        LOG::record(UTILLOGLEVEL, "tcpGenericConnect : %s", strerror(errno));
+        LOG::record(UTILLOGLEVEL1, "tcpGenericConnect : %s", strerror(errno));
         return UTILNET_ERROR;
     }
+    std::thread alineread(threadRead,fd);
+    alineread.detach();
 
-    char buf[37]="hello\0";
-    int r=write(fd,buf,6);
-    if(r < 0)
-    {
-        LOG::record(UTILLOGLEVEL, "write %d : %s\n", __LINE__,strerror(errno));
-        return UTILNET_ERROR;
-    }
-
-    r=read(fd,buf,37);
-    if(r < 0)
-    {
-        LOG::record(UTILLOGLEVEL, "read %d : %s\n", __LINE__,strerror(errno));
-        return UTILNET_ERROR;
-    }
-    printf("r:%d this is received from %s\n",r,buf);
-
+    char buf[TMPBUFFERLEN];
+    int diagcount=0;
+    int r=0;
 
     while(1)
     {
-        
+        memset(buf,0,TMPBUFFERLEN);
+        r=read(fd,buf,TMPBUFFERLEN);
+        if(r < 0)
+        {
+            if ((errno == EINTR)||(errno == EAGAIN))
+            {
+                continue;
+            }else{
+                LOG::record(UTILLOGLEVEL1, "read %d : %s\n", __LINE__,strerror(errno));
+                break ;
+            }
+        }
+        if(r==0)
+        {
+            printf("server is closed! break;\n");
+            break;
+        }
+        diagcount++;
+        printf("count:%d len:%d  other to local:\n%s\n",r,diagcount,buf);
     }
 
     close(fd);
