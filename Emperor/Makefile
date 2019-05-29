@@ -1,4 +1,4 @@
-FINAL_CFLAGS=-W -std=c++11 $(DEBUG)
+FINAL_CFLAGS=-W -std=c++11 $(DEBUG) -pthread
 
 OPTIMIZATION?=-O2
 DEBUG=-g
