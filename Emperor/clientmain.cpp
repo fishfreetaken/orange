@@ -1,5 +1,36 @@
 #include "util.h"
-#define TMPBUFFERLEN 100
+#define TMPBUFFERLEN 300
+
+/*
+void serialinput(char *buf,int len)
+{
+    memset(buf,0,len);
+    char ch;    
+    int i = 0;
+    while (1)
+    {
+        ch = getc();
+        if (ch == 13)
+            break;
+        if (ch == 8)
+        {
+            i--;
+            //RePrint(i);
+            continue;
+        }
+        std::cout<<ch;
+        buf[i]=ch;
+        i++;
+        if(i==len)
+        {
+            LOG::record(UTILLOGLEVEL1, "serialinput exceed %d\n", len);
+            buf[len-1]='\0';
+            break;
+        }
+    }
+    std::cout<<std::endl;
+    return ;
+}*/
 
 void threadRead(int fd)
 {
@@ -30,8 +61,17 @@ void threadRead(int fd)
     printf("threadRead over!");
 }
 
+
 int main()
 {
+    /*
+    for(int i=0;i<3;i++)
+    {
+        int fk_fd=fork(); //2的n次方个进程
+    }
+    */
+    char buf[TMPBUFFERLEN];
+
     int port =8889;
     int fd=tcpGenericConnect(NULL,port,"10.8.49.62",8888);
     if(fd < 0)
@@ -42,7 +82,6 @@ int main()
     std::thread alineread(threadRead,fd);
     alineread.detach();
 
-    char buf[TMPBUFFERLEN];
     int diagcount=0;
     int r=0;
 
@@ -67,6 +106,9 @@ int main()
         }
         diagcount++;
         printf("count:%d len:%d  other to local:\n%s\n",r,diagcount,buf);
+        transfOnPer rec;
+        memcpy(&rec,buf,sizeof(transfOnPer));
+        printf("id:%d to:%d size:%d\n",rec.id,rec.to,rec.size);
     }
 
     close(fd);
