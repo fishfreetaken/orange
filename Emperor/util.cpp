@@ -141,3 +141,13 @@ end:
     freeaddrinfo(servinfo);
     return socket_fd;
 }
+
+int writeGenericSend(int fd,const char * buf,int len)
+{
+    int re=write(fd,buf,len);
+    if (re<0)
+    {
+        LOG::record(UTILLOGLEVEL1, "%s error : %s",__FUNCTION__, strerror(errno));
+    }
+    return re;
+}
