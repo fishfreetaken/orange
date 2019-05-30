@@ -5,6 +5,7 @@
 
 #include <errno.h>
 #include <string.h>
+#include <string>
 
 #include <stdio.h>
 #include <unistd.h>
@@ -26,3 +27,18 @@
 int tcpGenericServer(const char *source_addr,int port);
 int tcpGenericConnect(const char *source_addr,int port,const char *dest_ip,int dest_port);
 void setNonBlock(int socket_fd);
+int writeGenericSend(int fd,const char * buf,int len);
+
+typedef struct transferObj {
+    uint id; //=1
+    int from;
+    int to;
+    std::string buf_;
+} transfObjInfo;
+
+typedef struct transferOnlinePersion{
+    uint id; //=2
+    int to;
+    int size;
+    uint list_[52];
+} transfOnPer;
