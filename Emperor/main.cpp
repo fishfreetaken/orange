@@ -2,7 +2,11 @@
 #include "util.h"
 
 #define TMPBUFFERSIZE 64
+#define MAXIUMEVENTS 3
+#define SERVERLISTENPORT 8888
+#define SERVERIP    "10.8.49.62"
 
+std::vector<int> vecclient;
 int transfertwo(int _in_fd,int _out_fd)
 {
     char buf[TMPBUFFERSIZE]={0};
@@ -41,8 +45,23 @@ int transfertwo(int _in_fd,int _out_fd)
     return UTILNET_SUCCESS;
 }
 
-void epollreadcallback(int fd)
+void epollCreateEvents(int ep_fd,int tfd)
+{   
+    struct epoll_event ee = {0,0};
+    ee.events |=  EPOLLIN | EPOLLET;
+    ee.data.fd=tfd;
+
+    LOG::record(UTILNET_ERROR,"epoll create %d:%d\n",ep_fd,tfd);
+    if(epoll_ctl(ep_fd,EPOLL_CTL_ADD,tfd,&ee)==-1)
+    {
+        LOG::record(UTILNET_ERROR,"epoll create %d:%s\n",errno,strerror(errno));
+    }
+    vecclient.push_back(tfd);
+}
+
+void epollReadCallback(int fd)
 {
+    //printf("this is epoll read callback!\n");
     char buf[TMPBUFFERSIZE]={0};
     memset(buf,0,TMPBUFFERSIZE);
     int rlen= read(fd,buf,TMPBUFFERSIZE);
@@ -64,11 +83,56 @@ void epollreadcallback(int fd)
     }while(0);
 }
 
+void epollAcceptCallback(int ep_fd,int fd)
+{
+    int tfd=0;
+    static int count=0;
+    struct sockaddr m;
+    socklen_t flag=1;
+    do{
+        tfd=accept(fd,&m,&flag);
+        if(tfd==-1)
+        {
+            if ((errno == EINTR)||(errno == EAGAIN))
+            {
+                LOG::record(UTILNET_ERROR,"%d accept:%s \n",errno,strerror(errno));
+                continue;
+            }else{
+                LOG::record(UTILNET_ERROR,"%d accept:%s \n",errno,strerror(errno));
+                break; 
+            }
+        }
+        break;
+    }while(1);
+    count++;
+    printf("accept a connect:%d count:%d\n",tfd,count);
+    
+    setNonBlock(tfd);
+
+    epollCreateEvents(ep_fd,tfd);
+
+    transfOnPer reb;
+    reb.id=2;
+    reb.to=tfd;
+    for(size_t i=1;i<vecclient.size();i++)
+    {
+        if(vecclient[i]==tfd)
+        {
+            continue;
+        }
+        reb.list_[i-1]=vecclient[i];
+    }
+    reb.size=vecclient.size()-2;
+    printf("tfd:%d size:%d\n",reb.to,reb.size);
+    writeGenericSend(tfd,(char *)&reb,sizeof(transfOnPer));
+
+    return;
+}
+
 int main()
 {
-    int port =8888;
 
-    int fd=tcpGenericServer("10.8.49.62",port);
+    int fd=tcpGenericServer(SERVERIP,SERVERLISTENPORT);
     if(fd < 0)
     {
         LOG::record(UTILLOGLEVEL1, "createlistst __LINE__ : %s", strerror(errno));
@@ -77,83 +141,47 @@ int main()
 
     printf("success create server fd: %d\n",fd);
 
-    int ep_fd=epoll_create(1024);
-    if (ep_fd<0)
+    int ep_fd=epoll_create(MAXIUMEVENTS);
+    if (ep_fd < 0)
     {
         LOG::record(1,"epcreate error:%d %s\n",errno,strerror(errno));
     }
 
-    //char buf[TMPBUFFERSIZE]={0};
-    //char wbuf[TMPBUFFERSIZE]={0};
-    std::vector<int> vecclient;
-
-    struct sockaddr m;
-    socklen_t flag=1;
-    int count=0;
-    while(1)
-    {
-        int tfd=accept(fd,&m,&flag);
-        if(tfd==-1)
-        {
-            if ((errno == EINTR)||(errno == EAGAIN))
-            {
-                continue;
-            }else{
-                LOG::record(UTILNET_ERROR,"%d accept:%s \n",errno,strerror(errno));
-                return -1;
-            }
-        }
-        LOG::record(1,"accept a connect:%d\n",tfd);
-        
-        //close(tfd);
-        count++;
-        LOG::record(UTILNET_ERROR,"__LINE__ accept count:%d\n",count);
-
-        setNonBlock(tfd);
-
-        vecclient.push_back(tfd);
-        struct epoll_event ee = {0,0};
-        ee.events |=  EPOLLIN | EPOLLET;
-        ee.data.fd=tfd;
-        //ee.data.ptr=(void*)epollreadcallback;
-        if(epoll_ctl(ep_fd,EPOLL_CTL_ADD,tfd,&ee)==-1)
-        {
-            LOG::record(UTILNET_ERROR,"epoll create %d:%s\n",errno,strerror(errno));
-        }
-        if(count==1)
-        {
-            break;
-        }
-    }
+    epollCreateEvents(ep_fd,fd);
 
     int numReady=0;
     printf("go into transfer!\n");
 
     while(1)
     {
-        struct epoll_event ee[4];
-        numReady=epoll_wait(ep_fd,ee,1024,10000);
+        struct epoll_event ee[MAXIUMEVENTS];
+        numReady=epoll_wait(ep_fd,ee,MAXIUMEVENTS,15000);
         if(numReady==-1)
         {
             LOG::record(UTILNET_ERROR,"epoll create %d:%s\n",errno,strerror(errno));
         }
-        if((numReady==0)||(numReady>4))
+        /*
+        if(numReady==0)
         {
-            printf("exceed the time num is zero!%d\n",numReady);
-        }
+            //printf("exceed the time num is zero!%d\n",numReady);
+        }*/
 
         for(int i=0;i<numReady;i++)
         {
-            printf("occure info fd:%d ",ee[i].data.fd);
+            if(ee[i].data.fd==vecclient[0])
+            {
+                epollAcceptCallback(ep_fd,fd);
+                continue;
+            }
             if(ee[i].events & EPOLLIN )
             {
-                epollreadcallback(ee[i].data.fd);
+                epollReadCallback(ee[i].data.fd);
             }
         }
     }
 
     //printf("rev:%s\n",buf);//如果不加\n符号，是不会从stdout中打印出来的！
-
+/*
     printf("go into transfer2!\n");
     int rlen =0;
     int communit=0;
@@ -168,8 +196,9 @@ int main()
             break;
         }
     }
+    */
 
-    LOG::record(UTILNET_ERROR,"dialog over! break count:%d",count);
+    LOG::record(UTILNET_ERROR,"dialog over! break \n");
     for (auto i :vecclient)
     {
         close(i);
