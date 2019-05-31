@@ -4,7 +4,7 @@
 #define TMPBUFFERSIZE 64
 #define MAXIUMEVENTS 3
 #define SERVERLISTENPORT 8888
-#define SERVERIP    "10.8.49.62"
+
 
 std::vector<int> vecclient;
 int transfertwo(int _in_fd,int _out_fd)
@@ -113,6 +113,7 @@ void epollAcceptCallback(int ep_fd,int fd)
 
     transfOnPer reb;
     reb.id=2;
+    reb.from=fd;
     reb.to=tfd;
     for(size_t i=1;i<vecclient.size();i++)
     {
@@ -124,7 +125,7 @@ void epollAcceptCallback(int ep_fd,int fd)
     }
     reb.size=vecclient.size()-2;
     printf("tfd:%d size:%d\n",reb.to,reb.size);
-    writeGenericSend(tfd,(char *)&reb,sizeof(transfOnPer));
+    writeGenericSend(tfd,(char *)&reb,STRUCTONPERLEN);
 
     return;
 }

@@ -24,6 +24,8 @@
 #define UTILNET_SUCCESS  0
 #define UTILNET_ERROR  -1
 
+#define SERVERIP    "localhost"
+
 int tcpGenericServer(const char *source_addr,int port);
 int tcpGenericConnect(const char *source_addr,int port,const char *dest_ip,int dest_port);
 void setNonBlock(int socket_fd);
@@ -36,9 +38,14 @@ typedef struct transferObj {
     std::string buf_;
 } transfObjInfo;
 
+//统一的一个包头结构
 typedef struct transferOnlinePersion{
     uint id; //=2
+    int from;
     int to;
     int size;
-    uint list_[52];
+    char list_[100];
 } transfOnPer;
+
+#define STRUCTONPERLEN  sizeof(transfOnPer)
+
