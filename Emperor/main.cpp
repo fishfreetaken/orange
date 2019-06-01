@@ -3,8 +3,6 @@
 
 #define TMPBUFFERSIZE 64
 #define MAXIUMEVENTS 3
-#define SERVERLISTENPORT 8888
-
 
 std::vector<int> vecclient;
 int transfertwo(int _in_fd,int _out_fd)
@@ -48,7 +46,7 @@ int transfertwo(int _in_fd,int _out_fd)
 void epollCreateEvents(int ep_fd,int tfd)
 {   
     struct epoll_event ee = {0,0};
-    ee.events |=  EPOLLIN | EPOLLET;
+    ee.events |=  EPOLLIN | EPOLLET |EPOLLRDHUP;
     ee.data.fd=tfd;
 
     LOG::record(UTILNET_ERROR,"epoll create %d:%d\n",ep_fd,tfd);
@@ -133,7 +131,7 @@ void epollAcceptCallback(int ep_fd,int fd)
 int main()
 {
 
-    int fd=tcpGenericServer(SERVERIP,SERVERLISTENPORT);
+    int fd=tcpGenericServer(SERVERLISTENIP,SERVERLISTENPORT);
     if(fd < 0)
     {
         LOG::record(UTILLOGLEVEL1, "createlistst __LINE__ : %s", strerror(errno));
@@ -177,6 +175,10 @@ int main()
             if(ee[i].events & EPOLLIN )
             {
                 epollReadCallback(ee[i].data.fd);
+            }
+            if(ee[i].events & EPOLLRDHUP )
+            {
+                printf("disconnect event occur fd:%d\n",ee[i].data.fd);
             }
         }
     }

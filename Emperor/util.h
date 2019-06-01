@@ -24,7 +24,8 @@
 #define UTILNET_SUCCESS  0
 #define UTILNET_ERROR  -1
 
-#define SERVERIP    "localhost"
+#define SERVERLISTENIP    "localhost"
+#define SERVERLISTENPORT 8888
 
 int tcpGenericServer(const char *source_addr,int port);
 int tcpGenericConnect(const char *source_addr,int port,const char *dest_ip,int dest_port);

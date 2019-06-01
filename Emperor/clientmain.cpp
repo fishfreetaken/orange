@@ -73,7 +73,7 @@ int main()
     char buf[TMPBUFFERLEN];
 
     int port =8889;
-    int fd=tcpGenericConnect(NULL,port,SERVERIP,8888);
+    int fd=tcpGenericConnect(NULL,port,SERVERLISTENIP,SERVERLISTENPORT);
     if(fd < 0)
     {
         LOG::record(UTILLOGLEVEL1, "tcpGenericConnect : %s", strerror(errno));
