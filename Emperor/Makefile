@@ -7,7 +7,7 @@ SERVER_CC=$(CXX) $(FINAL_CFLAGS)
 
 SUM_SERVER_NAME=server
 SUM_CLIENT_NAME=client
-SUM_SERVER_OBJ= main.o util.o log.o
+SUM_SERVER_OBJ= main.o util.o log.o genrandom.o
 SUM_CLIENT_OBJ= clientmain.o util.o log.o 
 
 all: $(SUM_SERVER_NAME) $(SUM_CLIENT_NAME)
