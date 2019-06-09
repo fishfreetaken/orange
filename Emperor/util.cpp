@@ -1,5 +1,6 @@
 
 #include "util.h"
+#include "log.h"
 
 int setResusedConfig(int socket_fd)
 {

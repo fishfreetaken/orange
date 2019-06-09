@@ -1,4 +1,5 @@
 #include "util.h"
+#include "log.h"
 #define TMPBUFFERLEN 300
 
 /*
@@ -108,7 +109,7 @@ int main()
         diagcount++;
         printf("count:%d len:%d  other to local:\n%s\n",r,diagcount,buf);
 
-        printf("parse receive:id:%d from:%d to:%d size:%d\n",data->id,data->from,data->to,data->size);
+        //printf("parse receive:id:%d from:%d to:%d size:%d\n",data->id,data->from,data->to,data->size);
     }
 
     close(fd);

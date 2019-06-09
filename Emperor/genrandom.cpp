@@ -3,7 +3,9 @@
 #include "log.h"
 #include <limits.h>
  GenRandomKey::GenRandomKey(uint32_t low,uint32_t high):
- normal(0)
+ normal(0),
+ realgen(nullptr),
+ realunif(nullptr)
 {
     std::random_device rd;
     gen =new std::mt19937_64(rd());
@@ -12,7 +14,9 @@
 }
 
 GenRandomKey::GenRandomKey():
- normal(0)
+ normal(0),
+ realgen(nullptr),
+ realunif(nullptr)
 {
     std::random_device rd;
     gen =new std::mt19937_64(rd());
@@ -21,7 +25,9 @@ GenRandomKey::GenRandomKey():
 }
 
 GenRandomKey::GenRandomKey(uint32_t t):
-normal(t)
+normal(t),
+realgen(nullptr),
+realunif(nullptr)
 {
     std::random_device rd;
     gen =new std::mt19937_64(rd());
@@ -33,6 +39,8 @@ GenRandomKey::~GenRandomKey()
 {
     delete gen;
     delete unif;
+    delete realgen;
+    delete realunif;
 }
 
 void GenRandomKey::GenNDigitU32(int n,std::vector<uint32_t>&v)
@@ -72,6 +80,17 @@ int GenRandomKey::GenStrEnLetter(size_t n, std::string &m)
     GenericStringGen(n,m,enst);
     return n;
 }
+std::string GenRandomKey::GenStrEnLetter(size_t n)
+{
+    std::string m;
+    if(enst.size()!=26)
+    {
+        enst.clear();
+        enst += "qwertyuiopasdfghjklzxcvbnm";
+    }
+    GenericStringGen(n,m,enst);
+    return m;
+}
 
 int GenRandomKey::GenStrDigit(size_t n, std::string &m)
 {
@@ -81,6 +100,18 @@ int GenRandomKey::GenStrDigit(size_t n, std::string &m)
         enst += "0123456789";
     }
     return GenericStringGen(n,m,enst);
+}
+
+double GenRandomKey::GenRealNum()
+{
+    if(realgen==nullptr)
+    {
+        std::random_device rd;
+        realgen =new std::mt19937_64(rd());
+
+        realunif=new std::uniform_real_distribution<double>(0,5);
+    }
+    return (*realunif)(*realgen);
 }
 
 

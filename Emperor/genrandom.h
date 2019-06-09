@@ -12,9 +12,14 @@ public:
 
     ~GenRandomKey();
 
+    double GenRealNum();
+
 
     int GenStrDigit(size_t n,std::string &m);
+    int GenStrFloatDi(size_t n, std::string &m);
     int GenStrEnLetter(size_t n, std::string &m);
+    std::string GenStrEnLetter(size_t n);
+
     int GenStrEnLeDigit(size_t n,std::string *m);
     //uint64_t GenDigitU64();
     void GenNDigitU32(int n,std::vector<uint32_t>&v);
@@ -30,6 +35,9 @@ private :
     std::uniform_int_distribution<uint32_t> *unif;
 
     uint32_t normal;
-    std::string enst;
+    std::string enst; //字典
+
+    std::mt19937_64 *realgen;
+    std::uniform_real_distribution<double> *realunif;
 
 };

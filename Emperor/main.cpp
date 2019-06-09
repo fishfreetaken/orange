@@ -1,6 +1,8 @@
 
 #include "util.h"
 
+#include "log.h"
+
 #define TMPBUFFERSIZE 64
 #define MAXIUMEVENTS 3
 
@@ -108,7 +110,7 @@ void epollAcceptCallback(int ep_fd,int fd)
     setNonBlock(tfd);
 
     epollCreateEvents(ep_fd,tfd);
-
+/*
     transfOnPer reb;
     reb.id=2;
     reb.from=fd;
@@ -124,6 +126,7 @@ void epollAcceptCallback(int ep_fd,int fd)
     reb.size=vecclient.size()-2;
     printf("tfd:%d size:%d\n",reb.to,reb.size);
     writeGenericSend(tfd,(char *)&reb,STRUCTONPERLEN);
+    */
 
     return;
 }
