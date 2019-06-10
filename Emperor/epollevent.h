@@ -3,34 +3,67 @@
 #define EPOLLMAXEVENTS 1024
 #define READBUFFLENMAX 512
 
-class user;
 class channel;
+class epollhandlebase
+{
+public:
+    virtual void ReadEvent(int tfd);
+    virtual void WriteEvent(int tfd);
+    virtual void AcceptEvent(int tfd);
+    virtual void DelEvent(int tfd);
+
+    /*epoll wait 等待轮训的时间 毫秒 */
+    virtual int GetWaitTimeOut();
+    virtual int GetListenFd();
+
+    virtual int EventsWait();
+};
 
 class epollevent{
 public:
-    epollevent(int listen_fd);
-    epollevent(int listen_fd,int time_out);
+    epollevent(epollhandlebase *p);
+    epollevent(epollhandlebase *p,int epollfd);
 
-    EpollEventWaite();
+    int EpollEventWait();
+
+    int EpollEventAdd(struct epoll_event &ee);
+
+    int EpollEventDel(int fd);
 
 private:
-    void EpollInit(int listen_fd,int time_out);
-
-    //入参，accept到的fd
-    void EpollCreateUserEvents(int tfd);
-
-    void EpollReadCallback(int tfd);
-
-    void EpollAcceptCallback(int fd);
-
-    void EpollDelEvent(int fd);
+    void EpollInit();
 
 private:
     int listen_fd_;
     int epollfd_;
-    int timeout_; //epoll wait 等待时间，毫秒；
-
-    char *readbuf_ ; //开辟一个固定大小的内存，用来缓存读取的数据
 
     struct epoll_event *ee_; //epoll wait event回调
+
+    epollhandlebase *objhandle_;
+};
+
+
+class  epollserverhandle:public epollhandlebase{
+public:
+    epollserverhandle(int timeout=1500);
+
+    ~epollserverhandle();
+    epollevent* ServerStart(const char* listenip,const int port);
+
+    void ReadEvent(int tfd);
+    //void WriteEvent(int tfd);
+    void AcceptEvent(int tfd);
+    void DelEvent(int tfd);
+
+    int GetListenFd();
+
+    int EventsWait();
+
+private:
+    int timeout_;
+    int listen_fd_;
+
+    epollevent* evp_;
+
+    channel *chm_;
 };
