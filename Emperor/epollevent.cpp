@@ -8,16 +8,16 @@ int epollhandlebase::WaitTimeOut()
     return -1;
 }
 
-epollevent::epollevent(epollhandlebase *p):
-listen_fd_(p->GetListenFd()),
+epollevent::epollevent(epollhandlebase *p,int listenfd=-1):
+listen_fd_(listenfd),
 epollfd_(-1),
 objhandle_(p)
 {
     EpollInit();
 }
 
-epollevent::epollevent(epollhandlebase *p,int epollfd):
-listen_fd_(p->GetListenFd()),
+epollevent::epollevent(epollhandlebase *p,int epollfd,int listenfd=-1):
+listen_fd_(listenfd),
 epollfd_(epollfd),
 objhandle_(p)
 {
@@ -96,9 +96,9 @@ int epollevent::EpollEventAdd(struct epoll_event &ee)
 }
 
 /*
-wait 之后需要定期查看心跳是否
+    wait 之后需要定期查看心跳是否
 */
-int epollevent::EpollEventWaite(int fd)
+int epollevent::EpollEventWaite()
 {
 
     memset(ee_,0,sizeof(struct epoll_event)*EPOLLMAXEVENTS);
@@ -123,8 +123,7 @@ int epollevent::EpollEventWaite(int fd)
         }
         else if(ee_[i].events & EPOLLRDHUP )
         {
-            EpollDelEvent(ee_[i].data.fd);
-            objhandle_->DelEvent(ee_[i].data.fd); //通知断开客户定制的
+            objhandle_->DelEvent(ee_[i].data.fd); //客户端主动断开连接
         }else{
             LOG::record(UTILLOGLEVEL1,"epoll_wait fd:%d not known events %u\n",ee_[i].data.fd,ee_[i].events);
         }
@@ -148,7 +147,7 @@ void epollevent::EpollDelEvent(int fd)
 }
 
 /*要快速的处理 */
-epollserverhandle::epollserverhandle(int timeout=-1): //-1就是阻塞wait
+epollserverhandle::epollserverhandle(int timeout=1500): //定时延长一个1.5s
 listen_fd_(-1),
 timeout_(timeout)
 {
@@ -160,30 +159,60 @@ epollserverhandle::~epollserverhandle()
     {
         delete evp_;
     }
+    if(chm_!=nullptr)
+    {
+        delete chm_;
+    }
+    if(tme_!=nullptr)
+    {
+        delete tme_;
+    }
 }
 
-epollevent* epollserverhandle::ServerStart(const char* listenip,const int port,int timeout=15000)
+int epollserverhandle::ServerStart(const char* listenip,const int port,int timeout=15000)
 {
     listen_fd_=tcpGenericServer(SERVERLISTENIP,SERVERLISTENPORT);
     if(fd < 0)
     {
         LOG::record(UTILLOGLEVEL1, "ServerStart failed %s : %s",__FUNCTION__, strerror(errno));
-        return nullptr;
+        return -1;
     }
-    evp_=new epollevent(this);
+    evp_=new epollevent(this,listen_fd_);
     if(evp_==nullptr)
     {
         LOG::record(UTILLOGLEVEL1, "ServerStart epollevent new failed %s : %s",__FUNCTION__, strerror(errno));
-        return evp_
+        return -1;
     }
 
     chm_= new channel();
     if(chm_==nullptr)
     {
         LOG::record(UTILLOGLEVEL1, "ServerStart channel new failed %s : %s",__FUNCTION__, strerror(errno));
+        return -1;
     }
 
-    return evp_;
+    tme_ = new timeevent();
+    if(tme_ == nullptr)
+    {
+        LOG::record(UTILLOGLEVEL1, "ServerStart timeevent new failed %s : %s",__FUNCTION__, strerror(errno));
+        return -1;
+    }
+
+    while(1)
+    {
+        evp_->EpollEventWaite();//程序主入口
+        TimeEventsProc();
+    }
+
+    return 0;
+}
+void epollserverhandle::TimeEventsProc()
+{
+    std::vector<int> t = tme_->TimeEventProc();
+    for(auto i:t)
+    {
+        DelEvent(i);
+    }
 }
 
 void epollserverhandle::AcceptEvent()
@@ -214,42 +243,79 @@ void epollserverhandle::AcceptEvent()
 
     if(evp_->EpollEventAdd(ee)>0)
     {
-        if(tfd!=listen_fd_)
-        {
-            chm_->AddNewUser(tfd);
-        }
+        /*添加定时事件，超时后将自动关闭该 端口*/
+        //chm_->AddNewUser(tfd);
+        tme_->TimeEventUpdate(timeout_,tfd);//注册时间事件，如果超时没有连接的话需要清楚断开该连接
     }
 }
 
 void epollserverhandle::ReadEvent(int tfd)
-{//扩展以后就是分配一个线程池进行处理。
-    /*
-    memset(readbuf_,0,STRUCTONPERLEN);
-    int rlen=0;
-    do{
-        rlen = read(fd,readbuf_,STRUCTONPERLEN);
-        if (rlen<0)
-        {
-            if (errno == EAGAIN) || (errno == EINTR)) {
-                continue; //Try again later
-            }
-            LOG::record(UTILLOGLEVEL1,"%s %d read:%s",__FUNCTION__,errno,strerror(errno));
-            break;
-        }else if(rlen==0)
-        {//断开连接的直接删除该事件
-            //EpollDelEvent(fd);
-            LOG::record(UTILLOGLEVEL1,"client diconnect %d",fd);
-            return ;
-        }
-        break;
-    }while(1);*/
+{
     /*将fd传递给下层的协议处理函数进行读取处理，还是说在上层进行一定的校验 */
-    chm_->UserReadProtocl(tfd); //进行协议解析处理
+    if(chm_->UserReadProtocl(tfd)>0)  //进行协议解析处理，考虑使用线程池进行处理，快速的进行切换
+    { //如果协议被有效的解析后，可以设置心跳时间
+        tme_->TimeEventUpdate(timeout_,tfd);//更新注册时间，否则将进行断开，同时用于心跳检测！
+    }else{ //不合法的连接及时关闭连接
+        DelEvent(tfd);
+    }
 }
 
 void epollserverhandle::DelEvent(int tfd)
 {
-    chm_->UserRemove(fd); //从队列中删除；
+    evp_->EpollDelEvent(tfd);
+    chm_->UserRemoveUser(tfd); //从队列中删除；
     ::close(tfd);
 }
+
+int timeevent::TimeEventUpdate(size_t milliseconds,int fd)
+{
+    /* 不管fd是否已经存在，都进行更新/添加新的时间事件*/
+
+    struct timeval tv;
+
+    gettimeofday(&tv, NULL);
+    
+    tv.tv_usec += milliseconds * 1000;
+    tv.tv_sec += (milliseconds / 1000) + tv.tv_usec/1000000;
+    tv.tv_usec = tv.tv_usec %1000000;
+    ump[fd]= tv;
+    return 0;
+}
+
+std::vector<int> timeevent::TimeEventProc()
+{
+    std::vector<int> m;
+    struct timeval tv;
+
+    gettimeofday(&tv, NULL);
+    for(auto it=ump_.begin();it!=ump_.end();)
+    {
+        if(TimeExceedJudge(tv,it->second))
+        {
+            m.push_back(it->first);
+            it= ump_.erase(it); //从队列中删除
+        }else{
+            it++;
+        }
+    }
+    return m;
+}
+
+int timeevent::TimeExceedJudge(struct timeval &a,struct timeval &b)
+{
+    if(a.tv_sec > b.tv_sec)
+    {
+        return 0;
+    }else if(a.tv_sec < b.tv_sec)
+    {
+        return 1;
+    }else{
+        if(a.tv_usec <= b.tv.usec)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 
