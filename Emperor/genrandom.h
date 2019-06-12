@@ -23,8 +23,10 @@ public:
     int GenStrEnLeDigit(size_t n,std::string *m);
     //uint64_t GenDigitU64();
     void GenNDigitU32(int n,std::vector<uint32_t>&v);
+    void GenUNDigitU32(int n,std::vector<uint32_t>&v); //生成一列不重复的随即数字S
 
     int GenAIntDigit();
+    uint GenAUIntDigit(int f);
 
 private:
     int GenericStringGen(size_t n,std::string &m, std::string &mod);

@@ -70,6 +70,17 @@ int GenRandomKey::GenAIntDigit()
     return (int)((*unif)(*gen)-UINT_MAX);
 }
 
+uint GenRandomKey::GenAUIntDigit(int f)
+{
+    if(f)
+    {
+        return (uint)(*unif)(*gen)%f;
+    }
+    return (uint)(*unif)(*gen);
+}
+
+
+
 int GenRandomKey::GenStrEnLetter(size_t n, std::string &m)
 {
     if(enst.size()!=26)

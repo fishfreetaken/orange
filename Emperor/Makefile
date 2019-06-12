@@ -35,4 +35,4 @@ $(SUM_MYSQL_NAME) : $(SUM_MYSQL_OBJ)
 
 .PHONY : clean
 clean:
-	rm  -rf $(SUM_SERVER_OBJ) clientmain.o
+	rm  -rf $(SUM_SERVER_OBJ) clientmain.o mysqltest.o $(SUM_SERVER_NAME) $(SUM_CLIENT_NAME) $(SUM_MYSQL_NAME)
