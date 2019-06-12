@@ -1,29 +1,83 @@
 
 
 #include "log.h"
+//#define MAXIUMBUFLEN 256
 
 /*epoll 创建的根据fd创建的一个user类*/
 user::user(int fd):
 fd_(fd),
-uid_(0);
+uid_(0),
+buffer_()  //使用主备定义好的消息协议
 {
 }
 
 user::~user()
 {
-    if(fd_>2)
+    if(buffer_!=nullptr)
     {
-        ::close(fd_);
-        //epoll中取消注册是事件
+        delete [] buffer_;
     }
+}
+
+int user::ReadBufferParse()
+{
+    /*如果有读取数据请求的时候再进行内存地址分配 */
+    if(buffer_==nullptr)
+    {
+        buffer_= new char[STRUCTONPERLEN];
+        if(buffer_==nullptr)
+        {
+            return USERNEWFAIL;
+        }
+    }
+    memset(buffer_,0,STRUCTONPERLEN);
+    int ret=0;
+    do{
+        
+        ret=read(fd_,buffer_,STRUCTONPERLEN);
+        if(len==-1)
+        {
+            if ((errno == EINTR)||(errno == EAGAIN))
+            {
+                LOG::record(UTILNET_ERROR,"%s readfail:%s \n",__FUNCTION__,strerror(errno));
+                continue;
+            }else{
+                LOG::record(UTILNET_ERROR,"%s readfail:%s \n",__FUNCTION__,strerror(errno));
+                return USERFDREADFAIL; 
+            }
+        }
+        break;
+    }while(1);
+    if(ret<STRUCTONPERLEN)
+    {
+        LOG::record(UTILNET_ERROR,"%s read len small:%d \n",__FUNCTION__,ret);
+        return USERFDREADFAIL;
+    }
+
+    /*解密并进行校验如果出错直接返回失败 */
+    ret=BufferDecryptCrc();
+    if(ret <0)
+    {
+        return ret;
+    }
+
+    ret=ParsePacket();
+    if(ret <0)
+    {
+        return ret;
+    }
+
+    return ret;
 }
 
 int user::ParsePacket(transfOnPer *info)
 {
-    if(info==nullptr)
+    transfOnPer *info=(transfOnPer *) buffer_;
+
+    if(uid_==0)
     {
-        LOG::record(UTILLOGLEVEL1,"user::ParsePacket info is NULL");
-        return -1;
+        /*从文件或者数据库中进行加载uid信息 */
+        LoadUserInfoFromDb(info->uid);
     }
 
     if(info->uid!=uid_)
@@ -35,7 +89,6 @@ int user::ParsePacket(transfOnPer *info)
     switch (info->fd)
     {
         case 0: //心跳包；应该需要应答
-
             break;
         case 1: //转发消息包；
             SendTo(info);
@@ -175,17 +228,8 @@ int channel::IncOnePartner(size_t uid,int fd)
     return 0;
 }
 
-user* UserOnlineReg(size_t &uid,int fd)
+user* channel::UserOnlineReg(size_t &uid,int fd)
 {
-    /*
-        fd不合法
-    */
-    if(fd<=2)
-    {
-        LOG::record(UTILLOGLEVEL1,"%s fd is invalid %d",__FUNCTION__,fd);
-        return nullptr;
-    }
-
     if(partermap.find(uid)==partermap.end())
     {
         /*
@@ -194,8 +238,26 @@ user* UserOnlineReg(size_t &uid,int fd)
         //LOG::record(UTILLOGLEVEL1,"%s no found uid: %zu",__FUNCTION__,uid);
         return IncOnePartner(uid,fd);;
     }
+
     user*p= partermap[uid];
     p.SetOnline(int fd);
 
     return p;
+}
+
+/*对协议进行一个解析，读入的数据进行 校验，解密{解密失败时候，判断为非法连接断开}，分析协议报头，处理动作： 登录-》消息转发-》跳转*/
+int channel::UserReadProtocl(int tfd)
+{
+    if(fdmapuser_.find(tfd)==fdmapuser_.end())
+    {
+        /*新加入连接的一个客户端，执行协议解析 */
+        fdmapuser_[tfd]=new user(tfd);
+        fdmapuser_[tfd].ParsePacket();
+    }
+    fdmapuser_[tfd].ParsePacket(int tfd);
+}
+
+int channel::ThreadWorkDispatch(int tfd)
+{
+
 }
