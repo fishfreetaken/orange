@@ -37,40 +37,26 @@ private:
     epollhandlebase *objhandle_;
 };
 
+class timeeventbase{
+public:
+    virtual int TimeOutHandle();
+}
+
 class timeevent {
+    typedef  struct timeeventstruct{
+        struct timeval tv;
+        timeeventbase * handle;
+    } tmestru;
 public:
     //int TimeEventUpdate(size_t milliseconds,int fd); //设置每个fd的过期时间
     std::vector<int> TimeEventProc(); //返回处理的fd个数，将过期的fd返回通知，并从事件map中进行取消注册，不再进行轮训
     int TimeEventUpdate(size_t milliseconds,int fd); //对于每个fd如果没有在map中的话，添加，如果在的话进行更新
 
+    int TimeEventUpdate(size_t milliseconds,int fd,timeeventbase* handle); //设置定时回调函数
+
 private :
     int TimeExceedJudge(struct timeval &a,struct timeval &b);
 private :
-    std::map<int,struct timeval> ump_;
+    std::map<int,tmestru> ump_;
 };
 
-class  epollserverhandle:public epollhandlebase{
-public:
-    epollserverhandle(int timeout=1500);
-
-    ~epollserverhandle();
-    void ServerStart(const char* listenip,const int port);
-
-    void ReadEvent(int tfd);
-    //void WriteEvent(int tfd);
-    void AcceptEvent(int tfd);
-    void DelEvent(int tfd);
-
-    int GetListenFd();
-
-private:
-    size_t timeout_;
-    //int tevtimeout_;
-    int listen_fd_;
-
-    epollevent* evp_;
-
-    channel *chm_;
-
-    timeevent *tme_;
-};
