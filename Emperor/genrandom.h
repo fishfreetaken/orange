@@ -26,7 +26,7 @@ public:
     void GenUNDigitU32(int n,std::vector<uint32_t>&v); //生成一列不重复的随即数字S
 
     int GenAIntDigit();
-    uint GenAUIntDigit(int f);
+    uint32_t GenAUIntDigit(int f);
 
 private:
     int GenericStringGen(size_t n,std::string &m, std::string &mod);

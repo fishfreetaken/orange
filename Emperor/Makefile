@@ -1,7 +1,6 @@
 FINAL_CFLAGS=-W -std=c++11 $(DEBUG) -pthread
 
 MYSQL_CONCPP_DIR =`mysql_config --cflags`
-MYSQL_LDLIBS= -lmysqlclient
 MYSQL_CPPFLAGS = `mysql_config --libs`
 
 
@@ -13,8 +12,8 @@ SERVER_CC=$(CXX) $(FINAL_CFLAGS)  $(MYSQL_CONCPP_DIR)
 SUM_SERVER_NAME=server
 SUM_CLIENT_NAME=client
 SUM_MYSQL_NAME=mysqltest
-SUM_SERVER_OBJ= main.o util.o log.o genrandom.o
-SUM_CLIENT_OBJ= clientmain.o util.o log.o 
+SUM_SERVER_OBJ= main.o util.o log.o genrandom.o 
+SUM_CLIENT_OBJ= clientmain.o util.o log.o clientuser.o epollevent.o
 SUM_MYSQL_OBJ= mysqltest.o genrandom.o
 
 all: $(SUM_SERVER_NAME) $(SUM_CLIENT_NAME) $(SUM_MYSQL_NAME)
@@ -35,4 +34,4 @@ $(SUM_MYSQL_NAME) : $(SUM_MYSQL_OBJ)
 
 .PHONY : clean
 clean:
-	rm  -rf $(SUM_SERVER_OBJ) clientmain.o mysqltest.o $(SUM_SERVER_NAME) $(SUM_CLIENT_NAME) $(SUM_MYSQL_NAME)
+	rm  -rf $(SUM_SERVER_OBJ) $(SUM_CLIENT_OBJ) mysqltest.o $(SUM_SERVER_NAME) $(SUM_CLIENT_NAME) $(SUM_MYSQL_NAME)

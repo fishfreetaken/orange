@@ -25,6 +25,9 @@ id 意义
 #define PROTOCALUIDMATCH 1
 #define PROTOCALNOTFOUND 2
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
 #define LOADCHARLEN 160
 
 #define LOADPERSONLEN 50
@@ -38,7 +41,7 @@ typedef struct transferfriendspacket{
 } transfPartner;
 
 typedef struct transferOnlinePersion{
-    uint id; //=2
+    uint32_t id; //=2
     size_t uid;
     size_t to;
     size_t size;

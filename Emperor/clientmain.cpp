@@ -1,37 +1,7 @@
 #include "util.h"
 #include "log.h"
+#include "clientuser.h"
 #define TMPBUFFERLEN 300
-
-/*
-void serialinput(char *buf,int len)
-{
-    memset(buf,0,len);
-    char ch;    
-    int i = 0;
-    while (1)
-    {
-        ch = getc();
-        if (ch == 13)
-            break;
-        if (ch == 8)
-        {
-            i--;
-            //RePrint(i);
-            continue;
-        }
-        std::cout<<ch;
-        buf[i]=ch;
-        i++;
-        if(i==len)
-        {
-            LOG::record(UTILLOGLEVEL1, "serialinput exceed %d\n", len);
-            buf[len-1]='\0';
-            break;
-        }
-    }
-    std::cout<<std::endl;
-    return ;
-}*/
 
 void threadRead(int fd)
 {
@@ -48,7 +18,7 @@ void threadRead(int fd)
              r=write(fd,buf,strlen(buf));
             if(r < 0)
             {
-                LOG::record(UTILLOGLEVEL1, "write %d : %s\n", __LINE__,strerror(errno));
+                LOG::record(UTILLOGLEVELERROR, "write %d : %s\n", __LINE__,strerror(errno));
             }
         }while(0);
         
@@ -71,13 +41,17 @@ int main()
         int fk_fd=fork(); //2的n次方个进程
     }
     */
+   epollclienthandle s(1234567);
+   s.StartConnect(SERVERLISTENIP,SERVERLISTENPORT);
+
+   #if 0
     char buf[TMPBUFFERLEN];
 
     int port =8889;
     int fd=tcpGenericConnect(NULL,port,SERVERLISTENIP,SERVERLISTENPORT);
     if(fd < 0)
     {
-        LOG::record(UTILLOGLEVEL1, "tcpGenericConnect : %s", strerror(errno));
+        LOG::record(UTILLOGLEVELERROR, "tcpGenericConnect : %s", strerror(errno));
         return UTILNET_ERROR;
     }
     std::thread alineread(threadRead,fd);
@@ -97,7 +71,7 @@ int main()
             {
                 continue;
             }else{
-                LOG::record(UTILLOGLEVEL1, "read %d : %s\n", __LINE__,strerror(errno));
+                LOG::record(UTILLOGLEVELERROR, "read %d : %s\n", __LINE__,strerror(errno));
                 break ;
             }
         }
@@ -111,7 +85,9 @@ int main()
 
         //printf("parse receive:id:%d from:%d to:%d size:%d\n",data->id,data->from,data->to,data->size);
     }
-
     close(fd);
+    #endif
+
+    
     return 0;
 }

@@ -144,13 +144,12 @@ out:
 
 int main()
 { 
-    
-
     struct timeval t1,t2;
     
     gettimeofday(&t1,NULL);
 
     std::thread p1(selectmytable,"t1",t1),p2(selectmytablesum,"t2",t1);
+    std::thread m[20];
     
     //selectmytable(100);
     p1.join();

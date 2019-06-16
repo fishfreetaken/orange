@@ -19,7 +19,7 @@ int transfertwo(int _in_fd,int _out_fd)
         {
             return UTILNET_SUCCESS;
         }
-        LOG::record(UTILLOGLEVEL1,"%d read:%s",errno,strerror(errno));
+        LOG::record(UTILLOGLEVELERROR,"%d read:%s",errno,strerror(errno));
         return UTILNET_ERROR;
     }
     else{
@@ -36,7 +36,7 @@ int transfertwo(int _in_fd,int _out_fd)
         rlen=write(_out_fd,buf,strlen(buf));
         if (rlen<0)
         {
-            LOG::record(UTILLOGLEVEL1,"read:%s",strerror(errno));
+            LOG::record(UTILLOGLEVELERROR,"read:%s",strerror(errno));
             return UTILNET_ERROR;
         }else{
             printf("write to _out_fd:%d len:%d\n",_out_fd,rlen);
@@ -46,7 +46,7 @@ int transfertwo(int _in_fd,int _out_fd)
 }
 
 void epollCreateEvents(int ep_fd,int tfd)
-{   
+{
     struct epoll_event ee = {0,0};
     ee.events |=  EPOLLIN | EPOLLET |EPOLLRDHUP;
     ee.data.fd=tfd;
@@ -68,7 +68,7 @@ void epollReadCallback(int fd)
     do{
         if (rlen<0)
         {
-            LOG::record(UTILLOGLEVEL1,"%s %d read:%s",__FUNCTION__,errno,strerror(errno));
+            LOG::record(UTILLOGLEVELERROR,"%s %d read:%s",__FUNCTION__,errno,strerror(errno));
             break;
         }
     }while(0);
@@ -77,7 +77,7 @@ void epollReadCallback(int fd)
     do{
         if (rlen<0)
         {
-            LOG::record(UTILLOGLEVEL1,"%s %d write:%s",__FUNCTION__,errno,strerror(errno));
+            LOG::record(UTILLOGLEVELERROR,"%s %d write:%s",__FUNCTION__,errno,strerror(errno));
             break;
         }
     }while(0);
@@ -137,7 +137,7 @@ int main()
     int fd=tcpGenericServer(SERVERLISTENIP,SERVERLISTENPORT);
     if(fd < 0)
     {
-        LOG::record(UTILLOGLEVEL1, "createlistst __LINE__ : %s", strerror(errno));
+        LOG::record(UTILLOGLEVELERROR, "createlistst __LINE__ : %s", strerror(errno));
         return -1;
     }
 

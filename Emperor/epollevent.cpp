@@ -1,15 +1,9 @@
 
 #include "util.h"
 #include "log.h"
-#include "channel.h"
+#include "epollevent.h"
 
-int epollhandlebase::WaitTimeOut()
-{
-    //默认的轮训时间1.5s
-    return -1;
-}
-
-epollevent::epollevent(epollhandlebase *p,int listenfd=-1):
+epollevent::epollevent(epollhandlebase *p,int listenfd):
 listen_fd_(listenfd),
 epollfd_(-1),
 objhandle_(p)
@@ -17,7 +11,7 @@ objhandle_(p)
     EpollInit();
 }
 
-epollevent::epollevent(epollhandlebase *p,int epollfd,int listenfd=-1):
+epollevent::epollevent(epollhandlebase *p,int epollfd,int listenfd):
 listen_fd_(listenfd),
 epollfd_(epollfd),
 objhandle_(p)
@@ -51,7 +45,7 @@ void epollevent::EpollInit()
     if(epollfd_<=2)
     {
         epollfd_=epoll_create(EPOLLMAXEVENTS);
-        if (ep_fd < 0)
+        if (epollfd_ < 0)
         {
             LOG::record(1,"epcreate error:%d %s\n",errno,strerror(errno));
             return;
@@ -78,7 +72,7 @@ int epollevent::EpollEventAdd(struct epoll_event &ee)
 {
     if(ee.data.fd<0)
     {
-        LOG::record(UTILLOGLEVEL1,"%s create events Failed\n",__FUNCTION__);
+        LOG::record(UTILLOGLEVELERROR,"%s create events Failed\n",__FUNCTION__);
         return -1;
     }
     /*
@@ -86,10 +80,10 @@ int epollevent::EpollEventAdd(struct epoll_event &ee)
     ee.events |=  EPOLLIN | EPOLLET |EPOLLRDHUP;
     ee.data.fd=tfd;
     */
-    printf("epoll create %d:%d\n",ep_fd,tfd);
-    if(epoll_ctl(epollfd_,EPOLL_CTL_ADD,tfd,&ee)==-1)
+    printf("epoll create %d\n",ee.data.fd);
+    if(epoll_ctl(epollfd_,EPOLL_CTL_ADD,ee.data.fd,&ee)==-1)
     {
-        LOG::record(UTILLOGLEVEL1,"epoll create %d:%s\n",errno,strerror(errno));
+        LOG::record(UTILLOGLEVELERROR,"epoll create %d:%s\n",errno,strerror(errno));
         return -1;
     }
     
@@ -103,10 +97,10 @@ int epollevent::EpollEventWaite()
 {
 
     memset(ee_,0,sizeof(struct epoll_event)*EPOLLMAXEVENTS);
-    int numReady=epoll_wait(epollfd_,ee_,MAXIUMEVENTS,objhandle_->WaitTimeOut());
+    int numReady=epoll_wait(epollfd_,ee_,EPOLLMAXEVENTS,objhandle_->WaitTimeOut());
     if(numReady<0)
     {
-        LOG::record(UTILLOGLEVEL1,"epoll_wait %d:%s\n",errno,strerror(errno));
+        LOG::record(UTILLOGLEVELERROR,"epoll_wait %d:%s\n",errno,strerror(errno));
         return numReady;
     }
 
@@ -114,7 +108,7 @@ int epollevent::EpollEventWaite()
     {
         if((ee_[i].data.fd==listen_fd_) && (ee_[i].events & EPOLLIN )) //添加事件
         {
-            objhandle_->AcceptEvent();
+            objhandle_->AcceptEvent(listen_fd_);
         }else if(ee_[i].events & EPOLLIN )
         {
             objhandle_->ReadEvent(ee_[i].data.fd);
@@ -126,28 +120,26 @@ int epollevent::EpollEventWaite()
         {
             objhandle_->DelEvent(ee_[i].data.fd); //客户端主动断开连接
         }else{
-            LOG::record(UTILLOGLEVEL1,"epoll_wait fd:%d not known events %u\n",ee_[i].data.fd,ee_[i].events);
+            LOG::record(UTILLOGLEVELERROR,"epoll_wait fd:%d not known events %u\n",ee_[i].data.fd,ee_[i].events);
         }
     }
     return 0;
 }
 
-void epollevent::EpollDelEvent(int fd)
+int epollevent::EpollDelEvent(int fd)
 {
-    printf("disconnect %d\n",fd);
+     LOG::record(UTILLOGLEVELRECORD,"%d disconnect\n",fd);
     struct epoll_event ee = {0}; /* avoid valgrind warning */
     ee.events = 0;
     ee.data.fd = fd;
     int ret=epoll_ctl(epollfd_,EPOLL_CTL_DEL,fd,&ee);
     if(ret<0)
     {
-        LOG::record(UTILLOGLEVEL1,"epoll_ctl %d:%s\n",errno,strerror(errno));
-        return;
+        LOG::record(UTILLOGLEVELERROR,"epoll_ctl %d:%s\n",errno,strerror(errno));
+        return ret;
     }
-    //channel::GetInstance()->UserRemove(fd); //从队列中删除；
+    return ret;
 }
-
-
 
 
 int timeevent::TimeEventUpdate(size_t milliseconds,int fd)
@@ -161,28 +153,16 @@ int timeevent::TimeEventUpdate(size_t milliseconds,int fd)
     tv.tv_usec += milliseconds * 1000;
     tv.tv_sec += (milliseconds / 1000) + tv.tv_usec/1000000;
     tv.tv_usec = tv.tv_usec %1000000;
-    ump_[fd]= tv;
+
+    ump_[fd] = tv;
     return 0;
 }
 
-int timeevent::TimeEventUpdate(size_t milliseconds,int fd,void* handle)
+int timeevent::TimeEventProc(std::vector<int> &m)
 {
-    /* 不管fd是否已经存在，都进行更新/添加新的时间事件*/
+    //std::vector<int> m;
     struct timeval tv;
-
-    gettimeofday(&tv, NULL);
-    
-    tv.tv_usec += milliseconds * 1000;
-    tv.tv_sec += (milliseconds / 1000) + tv.tv_usec/1000000;
-    tv.tv_usec = tv.tv_usec %1000000;
-    ump_[fd]= tv;
-    return 0;
-}
-
-std::vector<int> timeevent::TimeEventProc()
-{
-    std::vector<int> m;
-    struct timeval tv;
+    int ret=0;
 
     gettimeofday(&tv, NULL);
     for(auto it=ump_.begin();it!=ump_.end();)
@@ -191,11 +171,12 @@ std::vector<int> timeevent::TimeEventProc()
         {
             m.push_back(it->first);
             it= ump_.erase(it); //从队列中删除
+            ret++;
         }else{
             it++;
         }
     }
-    return m;
+    return ret;
 }
 
 int timeevent::TimeExceedJudge(struct timeval &a,struct timeval &b)
@@ -207,7 +188,7 @@ int timeevent::TimeExceedJudge(struct timeval &a,struct timeval &b)
     {
         return 1;
     }else{
-        if(a.tv_usec <= b.tv.usec)
+        if(a.tv_usec <= b.tv_usec)
         {
             return 1;
         }

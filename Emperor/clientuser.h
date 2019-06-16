@@ -1,24 +1,13 @@
-#include <queue>
+
+
 #include "protocal.h"
+#include "epollevent.h"
+#include <memory>
 
 #define  CLIENTREADBUFFERLEN  512
 #define  CLIENTWRITEBUFFERLEN 512
 
 #define VECTORBUFFERLEN 50
-
-class clientuser{
-
-public:
-    int SendMsg();
-    int ReadParseMsg();
-
-    int ReadSTD0();
-
-private:
-    int fd_;
-};
-
-class epollclienthandle:public epollhandlebase , timeeventbase{
 
 typedef struct friendsstruct{
     int  fd;             //文件fd
@@ -28,9 +17,12 @@ typedef struct friendsstruct{
     std::string signature;
 } friends;
 
+class epollclienthandle: public epollhandlebase{
+
 public:
     epollclienthandle(size_t uid);
-    void StartConnect(const char* listenip,int port);
+    ~epollclienthandle();
+    int StartConnect(const char* listenip,int port);
 
 public:
     void ReadEvent(int tfd);
@@ -38,30 +30,44 @@ public:
     void AcceptEvent(int tfd);
     void DelEvent(int tfd);
 
-public:
-    TimeOutHandle();
+private:
+    int FormMsgAddToBuffer(uint32_t msgid,const char*buf,int len);
+    int MsgSendFromStd0();
+
+
+    int PushMsgToTerminal(transfOnPer *p);
+    void AddNewFriends(transfOnPer *p);
+    void InintialMyInfo(transfOnPer *p);
+
+    void UserSendMsgPoll();
+
+    void CalculateCrc(transfOnPer *p);
+
+    transfOnPer * SendBufferPush();
+    transfOnPer * SendBufferPop();
 
 private :
     int fd_;
-    int uid_;
+    size_t uid_;
     std::shared_ptr<epollevent> evp_;
 
-    std::vector<transfOnPer> recvbuffer_;
+    //std::vector<transfOnPer> recvbuffer_;
     std::vector<transfOnPer> sendbuffer_;
 
     char *readbuffer_;
     char *serverbuffer_;
 
-    int recv_pos_begin_;
-    int recv_pos_end_;
+    //int recv_pos_begin_;
+    //int recv_pos_end_;
 
     int send_pos_begin_;
     int send_pos_end_;
 
     std::shared_ptr<timeevent> tme_;
+    std::vector<int> timerollback_;
     friends myinfo_;
 
-    std::map<size_t,friends> myfriends_;
+    std::map<size_t, friends> myfriends_;
     size_t curdialog_; /*当前对话的伙伴 */
 };
 

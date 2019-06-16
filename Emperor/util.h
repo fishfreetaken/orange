@@ -18,6 +18,8 @@
 #include "genrandom.h"
 #include <vector>
 #include <thread>
+#include <iostream>
+#include <cstring>
 
 #include <sys/epoll.h>
 
@@ -37,6 +39,6 @@ int tcpGenericServer(const char *source_addr,int port);
 int tcpGenericConnect(const char *source_addr,int port,const char *dest_ip,int dest_port);
 void setNonBlock(int socket_fd);
 int writeGenericSend(int fd,const char * buf,int len);
-int readGenericReceive(int &fd,const char *buf,int &len);
+int readGenericReceive(int fd, char *buf,int len);
 
 

@@ -83,14 +83,14 @@ int user::ParsePacket()
         ret= LoadUserInfoFromDb(info->uid);
         if( USERSUCCESS !=ret )
         {
-            LOG::record(UTILLOGLEVEL1,"user::ParsePacket NotFoundUid uid:%zu",info->udi);
+            LOG::record(UTILLOGLEVELERROR,"user::ParsePacket NotFoundUid uid:%zu",info->udi);
             return ret;
         }
     }
 
     if(info->uid!=uid_)
     {
-        LOG::record(UTILLOGLEVEL1,"user::ParsePacket uid is mismatch: remote:%zu local:%zu",info->udi,uid_);
+        LOG::record(UTILLOGLEVELERROR,"user::ParsePacket uid is mismatch: remote:%zu local:%zu",info->udi,uid_);
         return USERIDMISMATCH;
     }
 
@@ -106,7 +106,7 @@ int user::ParsePacket()
         case 3: //公钥加密，协商对称秘钥
             break;
         default:
-            LOG::record(UTILLOGLEVEL1,"ParsePacket not recognised msg id");
+            LOG::record(UTILLOGLEVELERROR,"ParsePacket not recognised msg id");
             return USERFAILED;
             break;
     }
@@ -145,12 +145,12 @@ int user::SendMyself(transfOnPer *info)
 {
     if(info==NULL)
     {
-        LOG::record(UTILLOGLEVEL1,"%s para is NULL",__FUNCTION__);
+        LOG::record(UTILLOGLEVELERROR,"%s para is NULL",__FUNCTION__);
         return USERPOINTNULL;
     }
     if(info->to!=uid_)
     {
-        LOG::record(UTILLOGLEVEL1,"%s uid mismatch %zu",__FUNCTION__,info->to);
+        LOG::record(UTILLOGLEVELERROR,"%s uid mismatch %zu",__FUNCTION__,info->to);
         return USERIDMISMATCH;
     }
     //BufferCryptCrc();//测试的时候进行不处理加密功能，保留接口
@@ -164,7 +164,7 @@ int user::SendBuf(size_t len)
     ret = ::write(fd_,buffer_,len);
     if(ret<0)
     {
-        LOG::record(UTILLOGLEVEL1,"user::SendBuf :%d errnor:%s",errno,strerror(errno));
+        LOG::record(UTILLOGLEVELERROR,"user::SendBuf :%d errnor:%s",errno,strerror(errno));
     }
 
     return ret;
@@ -208,7 +208,7 @@ int user::InformPartnerOnline(user*p,size_t ret)
 {   
     auto it=partnermap.find(ret);
     if(it==partnermap.end()){
-        LOG::record(UTILLOGLEVEL1,"%s  not find partner :%zu",__FUNCTION__,p->ReturnUid());
+        LOG::record(UTILLOGLEVELERROR,"%s  not find partner :%zu",__FUNCTION__,p->ReturnUid());
         return USERNOTFOUNDID;
     }
     it->second=p;
