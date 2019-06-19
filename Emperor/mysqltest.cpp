@@ -142,8 +142,22 @@ out:
 }
 
 
+//std::vector<int> garr;
+std::set<int> garr;
+
+void vectortest(int i)
+{
+    for(int i=0;i<500;i++)
+    {
+       // garr.push_back(i);
+       garr.insert(i);
+    }
+}
+
+
 int main()
 { 
+    #if 0
     struct timeval t1,t2;
     
     gettimeofday(&t1,NULL);
@@ -159,7 +173,42 @@ int main()
     gettimeofday(&t2,NULL);
     double deltaT= double((t2.tv_sec-t1.tv_sec)*1000000+ t2.tv_usec-t1.tv_usec)/1000000;
     printf("deltat %f sec\n",deltaT);
-    
+
+    #endif
+
+    //std::vector<std::thread> pm;
+
+    std::thread p1(vectortest,1);
+    //std::thread p2(vectortest,2);
+   // std::thread p3(vectortest,3);
+   // std::thread p4(vectortest,4);
+   // std::thread p5(vectortest,5);
+
+    p1.join();
+    //p2.join();
+   // p3.join();
+   // p4.join();
+   // p5.join();
+
+    /* 
+    for(int i=0;i<5;i++)
+    {
+        pm.emplace_back(std::thread(vectortest,i));
+    }*/
+
+    return 2;
+
+    std::vector<int> toal(6,0);
+    for(auto i :garr)
+    {
+        toal[i]++;
+    }
+
+    for(int i=0;i<6;i++)
+    {
+        printf("%d : %d\n",i,toal[i]);
+    }
+
     //clockend(st);
 
 

@@ -1,6 +1,7 @@
 
 #include "util.h"
 #include "log.h"
+#include <memory>
 
 int setResusedConfig(int socket_fd)
 {
@@ -156,10 +157,21 @@ int writeGenericSend(int fd,const char * buf,int len)
 
 int readGenericReceive(int fd, char* buf,int len)
 {
-    int ret=::read(fd,buf,len);
-    if (ret<0)
-    {
-        LOG::record(UTILLOGLEVELERROR, "%s error : %s",__FUNCTION__, strerror(errno));
-    }
+    int ret=0;
+    std::memset(buf,0,len);
+    do{
+        ret=::read(fd,buf,len);
+        if (ret<0)
+        {
+            if ((errno == EINTR)||(errno== EAGAIN))
+            {
+                continue;
+            }
+            LOG::record(UTILLOGLEVELERROR,"%d read:%s",errno,strerror(errno));
+            return UTILNET_ERROR;
+        }
+        break;
+    }while(1);
+    
     return ret;
 }

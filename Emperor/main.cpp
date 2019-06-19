@@ -3,7 +3,7 @@
 
 #include "log.h"
 
-#define TMPBUFFERSIZE 64
+#define TMPBUFFERSIZE 128
 #define MAXIUMEVENTS 3
 
 std::vector<int> vecclient;
@@ -58,22 +58,35 @@ void epollCreateEvents(int ep_fd,int tfd)
     }
     vecclient.push_back(tfd);
 }
-
+std::vector<int> toji(7,0);
+int tt=0;
 void epollReadCallback(int fd)
 {
     //printf("this is epoll read callback!\n");
     char buf[TMPBUFFERSIZE]={0};
+    /* 
     memset(buf,0,TMPBUFFERSIZE);
     int rlen= read(fd,buf,TMPBUFFERSIZE);
     do{
         if (rlen<0)
         {
             LOG::record(UTILLOGLEVELERROR,"%s %d read:%s",__FUNCTION__,errno,strerror(errno));
-            break;
+            return;
         }
-    }while(0);
+    }while(0);*/
 
-    rlen=write(fd,buf,strlen(buf));
+    int rlen= readGenericReceive(fd, buf, TMPBUFFERSIZE);
+
+    tt++;
+    for(int i=0;i<rlen;i++)
+    {
+        toji[buf[i]-'0']++;
+    }
+    
+    //printf("printf reln:%d\n",rlen);
+
+    rlen+=snprintf(buf+rlen,TMPBUFFERSIZE,"rlen:%d;\n",rlen);
+    rlen=write(0,buf,rlen);
     do{
         if (rlen<0)
         {
@@ -137,7 +150,7 @@ int main()
     int fd=tcpGenericServer(SERVERLISTENIP,SERVERLISTENPORT);
     if(fd < 0)
     {
-        LOG::record(UTILLOGLEVELERROR, "createlistst __LINE__ : %s", strerror(errno));
+        LOG::record(UTILLOGLEVELERROR, " createlistst __LINE__ : %s", strerror(errno));
         return -1;
     }
 
@@ -162,6 +175,7 @@ int main()
         {
             LOG::record(UTILNET_ERROR,"epoll create %d:%s\n",errno,strerror(errno));
         }
+        //printf("timeout %d \n",numReady);
         /*
         if(numReady==0)
         {
@@ -181,7 +195,12 @@ int main()
             }
             if(ee[i].events & EPOLLRDHUP )
             {
-                printf("disconnect event occur fd:%d\n",ee[i].data.fd);
+                
+                printf("disconnect event occur fd:%d tt:%d\n",ee[i].data.fd,tt);
+                for(int i=1;i<toji.size();i++)
+                {
+                    printf("%d: %d\n",i,toji[i]);
+                }
             }
         }
     }
