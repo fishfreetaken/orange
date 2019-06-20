@@ -3,8 +3,10 @@
 
 #include "log.h"
 
-#define TMPBUFFERSIZE 128
+#define TMPBUFFERSIZE 8192
 #define MAXIUMEVENTS 3
+
+char allbuf[TMPBUFFERSIZE];
 
 std::vector<int> vecclient;
 int transfertwo(int _in_fd,int _out_fd)
@@ -63,9 +65,9 @@ int tt=0;
 void epollReadCallback(int fd)
 {
     //printf("this is epoll read callback!\n");
-    char buf[TMPBUFFERSIZE]={0};
+    //char buf[TMPBUFFERSIZE]={0};
+    memset(allbuf,0,TMPBUFFERSIZE);
     /* 
-    memset(buf,0,TMPBUFFERSIZE);
     int rlen= read(fd,buf,TMPBUFFERSIZE);
     do{
         if (rlen<0)
@@ -75,18 +77,32 @@ void epollReadCallback(int fd)
         }
     }while(0);*/
 
-    int rlen= readGenericReceive(fd, buf, TMPBUFFERSIZE);
+    int rlen= readGenericReceive(fd, allbuf, TMPBUFFERSIZE);
 
+    if(rlen<=0)
+    {
+        printf("readGenericReceive error %s\n",strerror(errno));
+        return ;
+    }
     tt++;
     for(int i=0;i<rlen;i++)
     {
-        toji[buf[i]-'0']++;
+        toji[allbuf[i]-'0']++;
+    }
+    if(rlen>10)
+    {
+        printf("printf reln:%d\n",rlen);
     }
     
-    //printf("printf reln:%d\n",rlen);
+    #if 0
+    if(rlen>(TMPBUFFERSIZE-10))
+    {
+        printf("printf reln:%d\n",rlen);
+    }else{
+        rlen+=snprintf(allbuf+rlen,(TMPBUFFERSIZE-rlen),"rlen:%d;\n",rlen);
+    }
 
-    rlen+=snprintf(buf+rlen,TMPBUFFERSIZE,"rlen:%d;\n",rlen);
-    rlen=write(0,buf,rlen);
+    rlen=write(0,allbuf,rlen);
     do{
         if (rlen<0)
         {
@@ -94,6 +110,8 @@ void epollReadCallback(int fd)
             break;
         }
     }while(0);
+    #endif
+
 }
 
 void epollAcceptCallback(int ep_fd,int fd)
@@ -154,7 +172,7 @@ int main()
         return -1;
     }
 
-    printf("success create server fd: %d\n",fd);
+    printf("success create server fd: %d port:%d\n",fd,SERVERLISTENPORT);
 
     int ep_fd=epoll_create(MAXIUMEVENTS);
     if (ep_fd < 0)
