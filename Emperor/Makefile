@@ -4,7 +4,7 @@ MYSQL_CONCPP_DIR =`mysql_config --cflags`
 MYSQL_CPPFLAGS = `mysql_config --libs`
 
 
-OPTIMIZATION?=-O2
+OPTIMIZATION?=-O0
 DEBUG=-g
 
 SERVER_CC=$(CXX) $(FINAL_CFLAGS)  $(MYSQL_CONCPP_DIR)
@@ -19,6 +19,11 @@ SUM_MYSQL_OBJ= mysqltest.o genrandom.o
 all: $(SUM_SERVER_NAME) $(SUM_CLIENT_NAME) $(SUM_MYSQL_NAME)
 	@echo "chat server!"
 	@echo $(SERVER_CC) $(SUM_CLIENT_NAME)
+
+Makefile.dep:
+	-$(SERVER_CC) -MM *.cpp > Makefile.dep 2> /dev/null || true
+
+-include Makefile.dep
 
 $(SUM_SERVER_NAME): $(SUM_SERVER_OBJ)
 	$(SERVER_CC) -o $@ $^
