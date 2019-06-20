@@ -5,11 +5,16 @@
 
 void threadRead(int fd,int i)
 {
-    char buf[TMPBUFFERLEN]={0};
-    snprintf(buf,TMPBUFFERLEN,"%d",i);
+    char buf[TMPBUFFERLEN];
+    std::memset(buf,0,TMPBUFFERLEN);
+    for(int t=0;t<1;t++)
+    {
+        buf[t]='0'+i;
+    }
+    //snprintf(buf,TMPBUFFERLEN,"%d",i);
     int ret=0;
-    printf("Hello thread read!\n");
-    int count=10000;
+    LOG::record(UTILLOGLEVELERROR,"Hello thread read! %s",buf);
+    int count=100000;
     while(count)
     {
         //memset(buf,0,TMPBUFFERLEN);
@@ -24,20 +29,15 @@ void threadRead(int fd,int i)
                     continue;
                 }
                 LOG::record(UTILLOGLEVELERROR,"%d read:%s",errno,strerror(errno));
-                return ;
+                break ;
             }
             break;
-        }while(1);
-        
-        if(strcmp(buf,"over")==0)
-        {
-            printf("skip the while\n");
-            break;
-        }
+        }while(0);
+
         count--;
         //printf("len:%d local to other:\n%s\n",ret,buf);
     }
-    printf("threadRead over!");
+    printf("threadRead over!\n");
 }
 
 
@@ -107,6 +107,5 @@ int main()
     close(fd);
     #endif
 
-    
     return 0;
 }
