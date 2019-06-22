@@ -1,6 +1,5 @@
 
 #include "util.h"
-#include "log.h"
 #include "epollevent.h"
 
 epollevent::epollevent(epollhandlebase *p,int listenfd):
@@ -128,8 +127,9 @@ int epollevent::EpollEventWaite()
 
 int epollevent::EpollDelEvent(int fd)
 {
-     LOG::record(UTILLOGLEVELRECORD,"%d disconnect\n",fd);
-    struct epoll_event ee = {0}; /* avoid valgrind warning */
+    LOG::record(UTILLOGLEVELRECORD,"%d disconnect\n",fd);
+    struct epoll_event ee ; /* avoid valgrind warning */
+    std::memset(&ee,0,sizeof(struct epoll_event));
     ee.events = 0;
     ee.data.fd = fd;
     int ret=epoll_ctl(epollfd_,EPOLL_CTL_DEL,fd,&ee);
