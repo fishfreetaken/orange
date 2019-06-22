@@ -1,7 +1,7 @@
 
 #include "clientuser.h"
 #include "util.h"
-#include "log.h"
+
 
 epollclienthandle::epollclienthandle(size_t uid):
 fd_(0),
@@ -31,7 +31,6 @@ epollclienthandle::~epollclienthandle()
     {
         ::close(fd_);
     }
-    
 }
 
 int epollclienthandle::StartConnect(const char* listenip,int port)
@@ -45,7 +44,7 @@ int epollclienthandle::StartConnect(const char* listenip,int port)
     fd_=tcpGenericConnect(NULL,0,listenip,port);
     if(fd_!=0)
     {
-        LOG::record(UTILLOGLEVELERROR, "tcpGenericConnect : %s", strerror(errno));
+        //LOG::record(UTILLOGLEVELERROR, "tcpGenericConnect : %s", strerror(errno));
         return UTILNET_ERROR;
     }
     LOG::record(UTILLOGLEVELWORNNING, "tcpGenericConnect server fd: %d", fd_);
@@ -72,11 +71,11 @@ int epollclienthandle::StartConnect(const char* listenip,int port)
         //UserSendMsgPoll(); //先将个人信息写入发送至服务端获取个人信息；
         ret=evp_->EpollEventWaite();//程序主入口，设置的轮训时间是1s，跳出来之后进行发送心跳包
         
-        //ret=tme_->TimeEventProc(timerollback_);
-        //if(ret>0)
-        //{
+        ret=tme_->TimeEventProc(timerollback_);
+        if(ret>0)
+        {
             FormMsgAddToBuffer(MSGHEART,nullptr,0); //1s发送一个心跳包
-        //}
+        }
     }
 }
 
@@ -194,6 +193,7 @@ void epollclienthandle::AddNewFriends(transfOnPer *p)
     t.name.assign(s->name);
     t.signature.assign(s->signature);
     myfriends_[s->uid] = t;
+    return;
 }
 
 
@@ -245,7 +245,7 @@ int epollclienthandle::FormMsgAddToBuffer(uint32_t msgid,const char*buf,int len)
     if(p==nullptr)
     {
         LOG::record(UTILLOGLEVELERROR, "FormMsgAddToBuffer SendBufferPush full");
-        return UTILPOINTER_NULL;
+        return UTIL_POINTER_NULL;
     }
     p->id=msgid;
     p->uid=uid_;
