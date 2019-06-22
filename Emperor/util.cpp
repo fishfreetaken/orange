@@ -1,6 +1,5 @@
 
 #include "util.h"
-#include "log.h"
 #include <memory>
 
 int setResusedConfig(int socket_fd)
@@ -146,10 +145,16 @@ end:
 
 int writeGenericSend(int fd,const char * buf,int len)
 {
+    if(buf==nullptr)
+    {
+        LOG::record(UTILLOGLEVELERROR, "%s buf is nullptr",__FUNCTION__);
+        return UTIL_POINTER_NULL;
+    }
     int re=write(fd,buf,len);
     if (re<0)
     {
         LOG::record(UTILLOGLEVELERROR, "%s error : %s",__FUNCTION__, strerror(errno));
+        return UTILNET_ERROR;
     }
     return re;
 }
@@ -157,21 +162,48 @@ int writeGenericSend(int fd,const char * buf,int len)
 
 int readGenericReceive(int fd, char* buf,int len)
 {
-    int ret=0;
+    if(buf==nullptr)
+    {
+        LOG::record(UTILLOGLEVELERROR, "%s buf is nullptr",__FUNCTION__);
+        return UTIL_POINTER_NULL;
+    }
     std::memset(buf,0,len);
+
+    int ret=0;
     do{
-        ret=::read(fd,buf,len);
-        if (ret<0)
+        ret=read(fd,buf,len);
+        if(len==-1)
         {
-            if ((errno == EINTR)||(errno== EAGAIN))
+            if ((errno == EINTR)||(errno == EAGAIN))
             {
+                LOG::record(UTILNET_ERROR,"%s readfail:%s \n",__FUNCTION__,strerror(errno));
                 continue;
+            }else{
+                LOG::record(UTILNET_ERROR,"%s readfail:%s \n",__FUNCTION__,strerror(errno));
+                return UTILLOGLEVELERROR; 
             }
-            LOG::record(UTILLOGLEVELERROR,"%d read:%s",errno,strerror(errno));
-            return UTILNET_ERROR;
         }
         break;
     }while(1);
-    
+
     return ret;
 }
+/* 
+
+void printTransfOnPer(transfOnPer *m)
+{
+    printf("============transfOnPer===struct=================\n");
+
+    printf("id=%lu\n",m->id);
+    printf("size=%lu\n",m->size);
+    printf("uid=%zu\n",m->uid);
+    printf("to=%zu\n",m->to);
+    printf("buf: %s\n",m->buf);
+    printf("crc:%s\n",m->crc32);
+    printf("=====================end==========================\n");
+}
+*/
+
+
+
+
