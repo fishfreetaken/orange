@@ -1,12 +1,9 @@
-
 #include "util.h"
+#include "protocal.h"
+#include "epollserverhandle.h"
 
-#include "log.h"
-
-#define TMPBUFFERSIZE 8192
+#define TMPBUFFERSIZE 64
 #define MAXIUMEVENTS 3
-
-char allbuf[TMPBUFFERSIZE];
 
 std::vector<int> vecclient;
 int transfertwo(int _in_fd,int _out_fd)
@@ -48,7 +45,7 @@ int transfertwo(int _in_fd,int _out_fd)
 }
 
 void epollCreateEvents(int ep_fd,int tfd)
-{
+{   
     struct epoll_event ee = {0,0};
     ee.events |=  EPOLLIN | EPOLLET |EPOLLRDHUP;
     ee.data.fd=tfd;
@@ -60,49 +57,22 @@ void epollCreateEvents(int ep_fd,int tfd)
     }
     vecclient.push_back(tfd);
 }
-std::vector<int> toji(7,0);
-int tt=0;
+
 void epollReadCallback(int fd)
 {
     //printf("this is epoll read callback!\n");
-    //char buf[TMPBUFFERSIZE]={0};
-    memset(allbuf,0,TMPBUFFERSIZE);
-    /* 
+    char buf[TMPBUFFERSIZE]={0};
+    memset(buf,0,TMPBUFFERSIZE);
     int rlen= read(fd,buf,TMPBUFFERSIZE);
     do{
         if (rlen<0)
         {
             LOG::record(UTILLOGLEVELERROR,"%s %d read:%s",__FUNCTION__,errno,strerror(errno));
-            return;
+            break;
         }
-    }while(0);*/
+    }while(0);
 
-    int rlen= readGenericReceive(fd, allbuf, TMPBUFFERSIZE);
-
-    if(rlen<=0)
-    {
-        printf("readGenericReceive error %s\n",strerror(errno));
-        return ;
-    }
-    tt++;
-    for(int i=0;i<rlen;i++)
-    {
-        toji[allbuf[i]-'0']++;
-    }
-    if(rlen>10)
-    {
-        printf("printf reln:%d\n",rlen);
-    }
-    
-    #if 0
-    if(rlen>(TMPBUFFERSIZE-10))
-    {
-        printf("printf reln:%d\n",rlen);
-    }else{
-        rlen+=snprintf(allbuf+rlen,(TMPBUFFERSIZE-rlen),"rlen:%d;\n",rlen);
-    }
-
-    rlen=write(0,allbuf,rlen);
+    rlen=write(fd,buf,strlen(buf));
     do{
         if (rlen<0)
         {
@@ -110,8 +80,6 @@ void epollReadCallback(int fd)
             break;
         }
     }while(0);
-    #endif
-
 }
 
 void epollAcceptCallback(int ep_fd,int fd)
@@ -141,7 +109,8 @@ void epollAcceptCallback(int ep_fd,int fd)
     setNonBlock(tfd);
 
     epollCreateEvents(ep_fd,tfd);
-/*
+
+    /*
     transfOnPer reb;
     reb.id=2;
     reb.from=fd;
@@ -164,15 +133,19 @@ void epollAcceptCallback(int ep_fd,int fd)
 
 int main()
 {
+    epollserverhandle m;
+    m.ServerStart(SERVERLISTENIP,SERVERLISTENPORT);
+
+    return 2;
 
     int fd=tcpGenericServer(SERVERLISTENIP,SERVERLISTENPORT);
     if(fd < 0)
     {
-        LOG::record(UTILLOGLEVELERROR, " createlistst __LINE__ : %s", strerror(errno));
+        LOG::record(UTILLOGLEVELERROR, "createlistst %s : %s",__LINE__, strerror(errno));
         return -1;
     }
 
-    printf("success create server fd: %d port:%d\n",fd,SERVERLISTENPORT);
+    printf("success create server fd: %d\n",fd);
 
     int ep_fd=epoll_create(MAXIUMEVENTS);
     if (ep_fd < 0)
@@ -193,7 +166,6 @@ int main()
         {
             LOG::record(UTILNET_ERROR,"epoll create %d:%s\n",errno,strerror(errno));
         }
-        //printf("timeout %d \n",numReady);
         /*
         if(numReady==0)
         {
@@ -213,33 +185,12 @@ int main()
             }
             if(ee[i].events & EPOLLRDHUP )
             {
-                
-                printf("disconnect event occur fd:%d tt:%d\n",ee[i].data.fd,tt);
-                for(int i=1;i<toji.size();i++)
-                {
-                    printf("%d: %d\n",i,toji[i]);
-                }
+                printf("disconnect event occur fd:%d\n",ee[i].data.fd);
             }
         }
     }
 
     //printf("rev:%s\n",buf);//如果不加\n符号，是不会从stdout中打印出来的！
-/*
-    printf("go into transfer2!\n");
-    int rlen =0;
-    int communit=0;
-    while(1)
-    {
-        if(transfertwo(vecclient[0],vecclient[1])<0)
-        {
-            break;
-        }
-        if(transfertwo(vecclient[1],vecclient[0])<0)
-        {
-            break;
-        }
-    }
-    */
 
     LOG::record(UTILNET_ERROR,"dialog over! break \n");
     for (auto i :vecclient)
