@@ -68,6 +68,8 @@ void epollserverhandle::AcceptEvent(int listenfd)
         break;
     }while(1);
 
+    LOG::record(UTILLOGLEVELRECORD,"server accept fd:%d \n",tfd);
+
     setNonBlock(tfd);
     struct epoll_event ee = {0,0};
     ee.events |=  EPOLLIN | EPOLLET |EPOLLRDHUP;

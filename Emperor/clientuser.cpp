@@ -37,17 +37,18 @@ int epollclienthandle::StartConnect(const char* listenip,int port)
 {
     if(uid_==0)
     {
-        LOG::record(UTILLOGLEVELERROR, "not valid uid");
+        LOG::record(UTILLOGLEVELERROR, "not valid uid zero");
         return UTILNET_ERROR; 
     }
-
+    
     fd_=tcpGenericConnect(NULL,0,listenip,port);
-    if(fd_!=0)
+    if(fd_<0)
     {
-        //LOG::record(UTILLOGLEVELERROR, "tcpGenericConnect : %s", strerror(errno));
+        LOG::record(UTILLOGLEVELERROR, "tcpGenericConnect : %s %d", strerror(errno),fd_);
         return UTILNET_ERROR;
     }
-    LOG::record(UTILLOGLEVELWORNNING, "tcpGenericConnect server fd: %d", fd_);
+
+    LOG::record(UTILLOGLEVELWORNNING,"tcpGenericConnect server fd: %d", fd_);
     try
     {
         evp_=std::make_shared<epollevent>(this,fd_);
@@ -60,7 +61,7 @@ int epollclienthandle::StartConnect(const char* listenip,int port)
     /*标准输入输出 */
     setNonBlock(0);
     struct epoll_event ee = {0,0};
-    ee.events |=  EPOLLIN | EPOLLET | EPOLLOUT | EPOLLHUP;
+    ee.events |=  EPOLLIN | EPOLLET ;
     ee.data.fd=0; //注册用户标准输入stdio 0事件；
 
     evp_->EpollEventAdd(ee);
@@ -68,7 +69,7 @@ int epollclienthandle::StartConnect(const char* listenip,int port)
     int ret=0;
     while(1)
     {
-        //UserSendMsgPoll(); //先将个人信息写入发送至服务端获取个人信息；
+        UserSendMsgPoll(); //先将个人信息写入发送至服务端获取个人信息；
         ret=evp_->EpollEventWaite();//程序主入口，设置的轮训时间是1s，跳出来之后进行发送心跳包
         
         ret=tme_->TimeEventProc(timerollback_);
@@ -78,6 +79,9 @@ int epollclienthandle::StartConnect(const char* listenip,int port)
         }
     }
 }
+
+/*与server端建立连接，通信！ */
+
 
 /*从server端收到的数据 */
 void epollclienthandle::AcceptEvent(int fd)
@@ -153,7 +157,7 @@ void epollclienthandle::ReadEvent(int tfd)
 void epollclienthandle::UserSendMsgPoll()
 {
     int ret=0;
-    transfOnPer * p;
+    transfOnPer * p=nullptr;
     while((p=SendBufferPop())!=nullptr)
     {
         ret=writeGenericSend(fd_,(char*)p, STRUCTONPERLEN);
@@ -227,10 +231,12 @@ int epollclienthandle::MsgSendFromStd0()
     int ret;
     std::memset(readbuffer_,0,CLIENTWRITEBUFFERLEN);
     ret=readGenericReceive(0,readbuffer_,CLIENTREADBUFFERLEN);
-    if(ret<0)
+    if(ret<=0)
     {
+        LOG::record(UTILLOGLEVELDIALOG,"read from 0 ret:%d",ret);
         return ret;
     }
+     LOG::record(UTILLOGLEVELDIALOG,"read from 0 msg:%s",readbuffer_);
     FormMsgAddToBuffer(MSGFRIEND,readbuffer_,ret);
 }
 
@@ -241,6 +247,7 @@ int epollclienthandle::FormMsgAddToBuffer(uint32_t msgid,const char*buf,int len)
         LOG::record(UTILLOGLEVELERROR, "FormMsgAddToBuffer msgid:1 and curdialog_ not initilized! cannot send");
         return UIIL_NOTFOUND;
     }
+    LOG::record(UTILLOGLEVELDIALOG, "time out and send a heart  msgid:%d  buf:%s",msgid, buf);
     transfOnPer *p= SendBufferPush();
     if(p==nullptr)
     {
@@ -309,6 +316,5 @@ void epollclienthandle::CalculateCrc(transfOnPer *p)
     {   
         LOG::record(UTILLOGLEVELERROR,"CalculateCrc s is nullptr\n");
     }
-    std::memcpy(s,0,4);
-    
+    //std::memcpy(s,0,4);
 }

@@ -36,7 +36,7 @@
 
 
 
-#define SERVERLISTENIP    "192.168.169.1"
+#define SERVERLISTENIP    "192.168.1.105"
 #define SERVERLISTENPORT 8888
 
 int tcpGenericServer(const char *source_addr,int port);

@@ -79,7 +79,7 @@ int epollevent::EpollEventAdd(struct epoll_event &ee)
     ee.events |=  EPOLLIN | EPOLLET |EPOLLRDHUP;
     ee.data.fd=tfd;
     */
-    printf("epoll create %d\n",ee.data.fd);
+    printf("epoll create fd: %d\n",ee.data.fd);
     if(epoll_ctl(epollfd_,EPOLL_CTL_ADD,ee.data.fd,&ee)==-1)
     {
         LOG::record(UTILLOGLEVELERROR,"epoll create %d:%s\n",errno,strerror(errno));

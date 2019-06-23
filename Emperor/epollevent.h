@@ -16,9 +16,8 @@ public:
 
     virtual int WaitTimeOut()
     {
-        return 1000;
+        return 1500;
     }
-
 };
 
 class epollevent{
