@@ -13,8 +13,12 @@ id 意义
 4 服务端获取消息:个人的uid
 5 朋友个人的信息包；
 */
+#include <string>
 #ifndef PAOROCAL_HEADER_
 #define PAOROCAL_HEADER_
+
+
+#pragma once
 
 #define MSGHEART        0 /*心跳 */
 #define MSGFRIEND       1 /*朋友转发包 */
@@ -30,11 +34,10 @@ id 意义
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#define LOADCHARLEN 160
+#define LOADCHARLEN 442
 
-#define LOADPERSONLEN 56
-#define LOADPERSONSIGNLEN 104
-
+#define LOADPERSONLEN 44
+#define LOADPERSONSIGNLEN 100
 
 #define LOADAESCRPTYKEYLEN 120
 #define LOADPERSONCRTPYLEN 40
@@ -51,13 +54,15 @@ typedef struct transferfriendspacket{
     char signature[LOADPERSONSIGNLEN];
 } transfPartner;
 
+
 typedef struct transferOnlinePersion{
     uint32_t id; //=2
     uint32_t size;
     size_t uid;  //db根据uid进行朋友索引
     size_t to;
     char buf[LOADCHARLEN];
-    char crc32[8];
+    //char crc32[8];
+    size_t crc32;
 } transfOnPer;
 
 #define STRUCTONPERLEN  sizeof(transfOnPer)
