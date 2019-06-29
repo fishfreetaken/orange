@@ -2,6 +2,7 @@
 
 #include "protocal.h"
 #include "epollevent.h"
+#include "cryptmsg.h"
 #include <memory>
 
 #define  CLIENTREADBUFFERLEN  512
@@ -9,6 +10,7 @@
 
 #define VECTORBUFFERLEN 50
 
+#if 0
 typedef struct friendsstruct{
     int  fd;             //文件fd
     int  uid;
@@ -16,6 +18,7 @@ typedef struct friendsstruct{
     std::string name;   //名称
     std::string signature;
 } friends;
+#endif
 
 class epollclienthandle: public epollhandlebase{
 
@@ -29,6 +32,7 @@ public:
     void WriteEvent(int tfd); //标准输出端口输出
     void AcceptEvent(int tfd);
     void DelEvent(int tfd);
+    int WaitTimeOut();
 
 private:
     int FormMsgAddToBuffer(uint32_t msgid,const char*buf,int len);
@@ -51,6 +55,8 @@ private :
     size_t uid_;
     std::shared_ptr<epollevent> evp_;
 
+    std::shared_ptr<cryptmsg> crypt_;
+
     //std::vector<transfOnPer> recvbuffer_;
     std::vector<transfOnPer> sendbuffer_;
 
@@ -65,10 +71,13 @@ private :
 
     std::shared_ptr<timeevent> tme_;
     std::vector<int> timerollback_;
-    friends myinfo_;
+    transfPartner myinfo_;
 
-    std::map<size_t, friends> myfriends_;
+    std::map<size_t, transfPartner> myfriends_;
     size_t curdialog_; /*当前对话的伙伴 */
+
+    size_t recpackagecount_;
+    size_t sendpackagecount_;
 };
 
 
