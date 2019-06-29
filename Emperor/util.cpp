@@ -1,6 +1,7 @@
 
 #include "util.h"
 #include <memory>
+#include <fstream>
 
 int setResusedConfig(int socket_fd)
 {
@@ -151,9 +152,9 @@ int writeGenericSend(int fd,const char * buf,int len)
         return UTIL_POINTER_NULL;
     }
     int re=write(fd,buf,len);
-    if (re<0)
+    if (re<=0)
     {
-        LOG::record(UTILLOGLEVELERROR, "%s error : %s",__FUNCTION__, strerror(errno));
+        LOG::record(UTILLOGLEVELERROR, "fd:%d %s error : %s",fd,__FUNCTION__, strerror(errno));
         return UTILNET_ERROR;
     }
     return re;
@@ -172,14 +173,14 @@ int readGenericReceive(int fd, char* buf,int len)
     int ret=0;
     do{
         ret=read(fd,buf,len);
-        if(len==-1)
+        if(ret==-1)
         {
             if ((errno == EINTR)||(errno == EAGAIN))
             {
-                LOG::record(UTILNET_ERROR,"%s readfail:%s \n",__FUNCTION__,strerror(errno));
-                continue;
+                LOG::record(UTILNET_ERROR,"%s LINE:%d readfail:%s \n",__FUNCTION__,__LINE__,strerror(errno));
+                return ret;
             }else{
-                LOG::record(UTILNET_ERROR,"%s readfail:%s \n",__FUNCTION__,strerror(errno));
+                LOG::record(UTILNET_ERROR,"%s LINE:%d readfail:%s \n",__FUNCTION__,__LINE__,strerror(errno));
                 return UTILLOGLEVELERROR; 
             }
         }
@@ -188,22 +189,35 @@ int readGenericReceive(int fd, char* buf,int len)
 
     return ret;
 }
-/* 
 
-void printTransfOnPer(transfOnPer *m)
+
+void printTransfOnPer(transfOnPer *m,const char* from)
 {
-    printf("============transfOnPer===struct=================\n");
+    /* 这边可以将心跳包进行过滤*/
+    if(m->id==MSGHEART)
+    {
+        return;
+    }
+    printf("=====transfOnPer===from:=====%s=====\n",from);
 
     printf("id=%lu\n",m->id);
     printf("size=%lu\n",m->size);
     printf("uid=%zu\n",m->uid);
     printf("to=%zu\n",m->to);
     printf("buf: %s\n",m->buf);
-    printf("crc:%s\n",m->crc32);
-    printf("=====================end==========================\n");
+    printf("crc:%zu\n",m->crc32); /*8个字节，直接强制输出一个整数 */
+    printf("==============end=================\n");
 }
-*/
 
 
+void printfPartner(transfPartner *m,const char *from)
+{
+    printf("=======printfPartner===from:%s=======\n",from);
+    printf("uid=%zu\n",m->uid);
+    printf("state=%x\n",m->state);
+    printf("name=%s\n",m->name);
+    printf("signarue=%s\n",m->signature);
+    printf("======printfPartner=====end===========\n");
+}
 
 
