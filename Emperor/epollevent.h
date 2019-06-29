@@ -16,8 +16,9 @@ public:
 
     virtual int WaitTimeOut()
     {
-        return 1500;
+        return 1000;
     }
+
 };
 
 class epollevent{
@@ -55,6 +56,7 @@ public:
 
 private :
     int TimeExceedJudge(struct timeval &a,struct timeval &b);
+    void TimeShow(struct timeval &tv);
 private :
     std::map<int,struct timeval> ump_;
 
