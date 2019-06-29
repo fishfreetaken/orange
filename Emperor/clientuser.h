@@ -1,42 +1,91 @@
 
-//#include "protocal.h"
 
-#include <string>
-#define CRYPTTYPERSA 1
+#include "protocal.h"
+#include "epollevent.h"
+#include "cryptmsg.h"
+#include <memory>
 
-class cryptmsg{
+#define  CLIENTREADBUFFERLEN  512
+#define  CLIENTWRITEBUFFERLEN 512
+
+#define VECTORBUFFERLEN 50
+
+#if 0
+typedef struct friendsstruct{
+    int  fd;             //文件fd
+    int  uid;
+    size_t state;
+    std::string name;   //名称
+    std::string signature;
+} friends;
+#endif
+
+class epollclienthandle: public epollhandlebase{
 
 public:
-    /* 
-        客户端和服务端都需要初始化对称加密和非对称加密的功能；
-        初始化时：先初始化一个非对称加密功能；
-    */
-    /*服务端直接先不初始化公钥，解密的时候再初始化 */
-    cryptmsg(); /*初始化rsa非对称加密秘钥，客户端初始化pubkey */
-    cryptmsg(const char *s,int len); /*初始化aes对称加密秘钥，输入一个解密的秘钥 */
-    ~cryptmsg();
+    epollclienthandle(size_t uid);
+    ~epollclienthandle();
+    int StartConnect(const char* listenip,int port);
 
-    int AESDecrypt(const char* in,int size, char * packet);
-    int AESEncrypt(const char* packet,int size,char *out);
+public:
+    void ReadEvent(int tfd);
+    void WriteEvent(int tfd); //标准输出端口输出
+    void AcceptEvent(int tfd);
+    void DelEvent(int tfd);
+    int WaitTimeOut();
 
-    /*从远程获取当前秘钥的私密，可以通过加密日期时间来区分秘钥 */
-    int RSADecrypt(const char* in,int size, char * packet);/*返回int的长度 */
-    int RSAEncrypt(const char* packet,int size,char *out );
-
-   // int AESSetDecryptKey(std::string &in);  /*设置一个对阵加密的解密的秘钥 */
-    int AESGenEnCryptKey(char *s,int len); /*生成一个对称加密的秘钥*/
-    
 private:
-    int AcquireRsaPubKey();  /*从第三方获取一个公共秘钥 */
-    int AcquireRsaSecKey();  /*预先在客户端内部加入一个公钥，使用文件配置私钥，从指定路径获取私钥*/
+    int FormMsgAddToBuffer(uint32_t msgid,const char*buf,int len);
+    int MsgSendFromStd0();
 
-    int AESCallEnCryptKey(std::string &m);   /*生成一个对称加密的秘钥 */
-private:
-    std::string aesdekey_; /*远端的 */
-    std::string aesenkey_; /*本地的 */
 
-    std::string rsapubkey_; /*有的只需要初始化一个aeskey就行 */
-    std::string rsaseckey_;
+    int PushMsgToTerminal(transfOnPer *p);
+    void AddNewFriends(transfOnPer *p);
+    void InintialMyInfo(transfOnPer *p);
 
+    void UserSendMsgPoll();
+
+    void CalculateCrc(transfOnPer *p);
+
+    transfOnPer * SendBufferPush();
+    transfOnPer * SendBufferPop();
+
+private :
+    int fd_;
+    size_t uid_;
+    std::shared_ptr<epollevent> evp_;
+
+    std::shared_ptr<cryptmsg> crypt_;
+
+    //std::vector<transfOnPer> recvbuffer_;
+    std::vector<transfOnPer> sendbuffer_;
+
+    char *readbuffer_;
+    char *serverbuffer_;
+
+    //int recv_pos_begin_;
+    //int recv_pos_end_;
+
+    int send_pos_begin_;
+    int send_pos_end_;
+
+    std::shared_ptr<timeevent> tme_;
+    std::vector<int> timerollback_;
+    transfPartner myinfo_;
+
+    std::map<size_t, transfPartner> myfriends_;
+    size_t curdialog_; /*当前对话的伙伴 */
+
+    size_t recpackagecount_;
+    size_t sendpackagecount_;
 };
+
+
+#if 0
+//使用Std的删除函数
+std::shared_ptr<int> sp(new int[10], std::default_delete<int[]>());
+
+//使用lambda表达式
+std::shared_ptr<int> sp(new int[10], [](int *p) { delete[] p; });
+#endif
 
