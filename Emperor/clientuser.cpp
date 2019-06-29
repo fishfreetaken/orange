@@ -8,7 +8,9 @@ fd_(0),
 uid_(uid),
 curdialog_(0),
 send_pos_begin_(-1),
-send_pos_end_(-1)
+send_pos_end_(-1),
+recpackagecount_(0),
+sendpackagecount_(0)
 {
     try{
         readbuffer_= new char[CLIENTREADBUFFERLEN];
@@ -33,35 +35,51 @@ epollclienthandle::~epollclienthandle()
     }
 }
 
+int epollclienthandle::WaitTimeOut()
+{
+    return 5000;
+}
+
 int epollclienthandle::StartConnect(const char* listenip,int port)
 {
     if(uid_==0)
     {
-        LOG::record(UTILLOGLEVELERROR, "not valid uid zero");
+        LOG::record(UTILLOGLEVELERROR, "not valid uid");
         return UTILNET_ERROR; 
     }
-    
+
     fd_=tcpGenericConnect(NULL,0,listenip,port);
     if(fd_<0)
     {
-        LOG::record(UTILLOGLEVELERROR, "tcpGenericConnect : %s %d", strerror(errno),fd_);
+        //LOG::record(UTILLOGLEVELERROR, "tcpGenericConnect : %s", strerror(errno));
         return UTILNET_ERROR;
     }
+    setNonBlock(fd_);
+    LOG::record(UTILLOGLEVELWORNNING, "tcpGenericConnect server fd: %d", fd_);
 
-    LOG::record(UTILLOGLEVELWORNNING,"tcpGenericConnect server fd: %d", fd_);
     try
     {
         evp_=std::make_shared<epollevent>(this,fd_);
         tme_=std::make_shared<timeevent>();
+        crypt_=std::make_shared<cryptmsg>();
     }catch (...){
         throw  strerror(errno);
     }
+
+    /*加密协议消息 */
+    transfcrptykey key;
+    std::memset(&key,0,sizeof(key));
+
+    crypt_->AESGenEnCryptKey(key.key,LOADAESCRPTYKEYLEN);
+    snprintf(key.secret,LOADPERSONCRTPYLEN,"dadonggeSecret");
+    FormMsgAddToBuffer(MSGSECRET,(char*)&key,sizeof(key));
+
     tme_->TimeEventUpdate(1500,fd_);
 
     /*标准输入输出 */
     setNonBlock(0);
     struct epoll_event ee = {0,0};
-    ee.events |=  EPOLLIN | EPOLLET ;
+    ee.events |=  EPOLLIN | EPOLLET;
     ee.data.fd=0; //注册用户标准输入stdio 0事件；
 
     evp_->EpollEventAdd(ee);
@@ -70,55 +88,65 @@ int epollclienthandle::StartConnect(const char* listenip,int port)
     while(1)
     {
         UserSendMsgPoll(); //先将个人信息写入发送至服务端获取个人信息；
+
         ret=evp_->EpollEventWaite();//程序主入口，设置的轮训时间是1s，跳出来之后进行发送心跳包
-        
+        if(ret<0)
+        {
+            LOG::record(UTILLOGLEVELWORNNING, "EpollEventWaite LINE=%d error ret=%d\n",__LINE__,ret);
+            break;
+        }
+
         ret=tme_->TimeEventProc(timerollback_);
         if(ret>0)
         {
+            tme_->TimeEventUpdate(1500,fd_);
             FormMsgAddToBuffer(MSGHEART,nullptr,0); //1s发送一个心跳包
         }
     }
 }
 
-/*与server端建立连接，通信！ */
-
-
 /*从server端收到的数据 */
 void epollclienthandle::AcceptEvent(int fd)
 {
     int ret=0;
-    while(1)
+
+    std::memset(serverbuffer_,0,CLIENTREADBUFFERLEN);
+    ret=readGenericReceive(fd_,serverbuffer_,STRUCTONPERLEN); 
+    if(ret<STRUCTONPERLEN)
     {
-        std::memset(serverbuffer_,0,CLIENTREADBUFFERLEN);
-        ret=readGenericReceive(fd_,serverbuffer_,STRUCTONPERLEN);
-        if(ret<=0)
-        {
+        /*这里应该将buf内容进行二进制的输出到log上 */
+        LOG::record(UTILLOGLEVELWORNNING, "readGenericReceive %s LINE:%d  ret:%d < %d",__FUNCTION__,__LINE__,ret,STRUCTONPERLEN);
+        return;
+    }
+    #if 0
+    ret=Decrypt() ; //使用密码进行解压；
+    if(ret!=0)
+    {
+        LOG::record(UTILLOGLEVELERROR, "decrypt failed! disregard msg ");
+    }
+    #endif
+    transfOnPer *p=(transfOnPer *)serverbuffer_;
+    recpackagecount_++;
+
+    printTransfOnPer(p, "epollclienthandle AcceptEvent");
+    
+    switch(p->id)
+    {
+        case MSGHEART:
             break;
-        }
-        #if 0
-        ret=Decrypt() ; //使用密码进行解压；
-        if(ret!=0)
-        {
-            LOG::record(UTILLOGLEVELERROR, "decrypt failed! disregard msg ");
-        }
-        #endif
-        transfOnPer *p=(transfOnPer *)serverbuffer_;
-        switch(p->id)
-        {
-            case MSGFRIEND:
-                PushMsgToTerminal(p);
-                break;
-            case MSGSERVERINFO:
-                InintialMyInfo(p);
-                break;
-            case MSGFRIENDINFO:
-                AddNewFriends(p);
-                break;
-            default:
-                LOG::record(UTILLOGLEVELWORNNING, "not recoginsed tid: %d", p->id);
-                return;
-                break;
-        }
+        case MSGFRIEND:
+            PushMsgToTerminal(p);
+            break;
+        case MSGSERVERINFO:
+            InintialMyInfo(p);
+            break;
+        case MSGFRIENDINFO:
+            AddNewFriends(p);
+            break;
+        default:
+            LOG::record(UTILLOGLEVELWORNNING, "not recoginsed tid: %d", p->id);
+            return;
+            break;
     }
     return ;
 }
@@ -157,7 +185,7 @@ void epollclienthandle::ReadEvent(int tfd)
 void epollclienthandle::UserSendMsgPoll()
 {
     int ret=0;
-    transfOnPer * p=nullptr;
+    transfOnPer * p;
     while((p=SendBufferPop())!=nullptr)
     {
         ret=writeGenericSend(fd_,(char*)p, STRUCTONPERLEN);
@@ -173,30 +201,33 @@ void epollclienthandle::InintialMyInfo(transfOnPer *p)
 {
     if(p->to!=uid_)
     {
-        LOG::record(UTILLOGLEVELERROR, "zero dest uid, invalid!");
+        LOG::record(UTILLOGLEVELERROR, "zero dest uid, invalid! to:%zu",p->to);
         return ;
     }
-    myinfo_.state=true;
     transfPartner *cc= (transfPartner *)p->buf;
-    myinfo_.name.assign(cc->name);
-    myinfo_.name.assign(cc->signature);
-    /*初始化一个本地写入的fd */
+    printfPartner(cc,"InintialMyInfo");
+    if(cc->uid==uid_)
+    {
+        myinfo_.state=1;
+        std::strcpy(myinfo_.name,cc->name);
+        std::strcpy(myinfo_.name,cc->signature);
+    }else{
+        myfriends_[cc->uid]=*cc ;
+    }
+
 }
 
 void epollclienthandle::AddNewFriends(transfOnPer *p)
 {
     /*1 添加新的朋友；2 更新在线状态 */
     transfPartner *s=(transfPartner *)p->buf;
+    printfPartner(s,"AddNewFriends");
     if(s->uid==0)
     {
         LOG::record(UTILLOGLEVELERROR, "zero dest uid, invalid!");
     }
-    friends t;
-    t.uid=s->uid;
-    t.state=s->state;
-    t.name.assign(s->name);
-    t.signature.assign(s->signature);
-    myfriends_[s->uid] = t;
+    myfriends_[s->uid]= *s;
+
     return;
 }
 
@@ -208,7 +239,7 @@ int epollclienthandle::PushMsgToTerminal(transfOnPer *p)
         LOG::record(UTILLOGLEVELERROR, "PushMsgToTerminal uid mismatch %zu %zu",uid_,p->uid);
         return PROTOCALUIDMATCH;
     }
-    
+
     if(myfriends_.find(p->uid)==myfriends_.end())
     {
         LOG::record(UTILLOGLEVELERROR, "not my friend %zu",p->uid);
@@ -231,29 +262,28 @@ int epollclienthandle::MsgSendFromStd0()
     int ret;
     std::memset(readbuffer_,0,CLIENTWRITEBUFFERLEN);
     ret=readGenericReceive(0,readbuffer_,CLIENTREADBUFFERLEN);
-    if(ret<=0)
+    if(ret<0)
     {
-        LOG::record(UTILLOGLEVELDIALOG,"read from 0 ret:%d",ret);
         return ret;
     }
-     LOG::record(UTILLOGLEVELDIALOG,"read from 0 msg:%s",readbuffer_);
     FormMsgAddToBuffer(MSGFRIEND,readbuffer_,ret);
 }
 
 int epollclienthandle::FormMsgAddToBuffer(uint32_t msgid,const char*buf,int len)
 {
+    /* 
     if((msgid==1)&&(curdialog_==0))
     {
         LOG::record(UTILLOGLEVELERROR, "FormMsgAddToBuffer msgid:1 and curdialog_ not initilized! cannot send");
         return UIIL_NOTFOUND;
-    }
-    LOG::record(UTILLOGLEVELDIALOG, "time out and send a heart  msgid:%d  buf:%s",msgid, buf);
+    }*/
     transfOnPer *p= SendBufferPush();
     if(p==nullptr)
     {
         LOG::record(UTILLOGLEVELERROR, "FormMsgAddToBuffer SendBufferPush full");
         return UTIL_POINTER_NULL;
     }
+    sendpackagecount_++;
     p->id=msgid;
     p->uid=uid_;
     p->to=curdialog_;
@@ -311,10 +341,12 @@ void epollclienthandle::CalculateCrc(transfOnPer *p)
         LOG::record(UTILLOGLEVELERROR,"CalculateCrc p is nullptr\n");
         return ;
     }
+    p->crc32=12345678;
+    /*
     char *s=p->crc32;
     if(s==nullptr)
     {   
         LOG::record(UTILLOGLEVELERROR,"CalculateCrc s is nullptr\n");
-    }
-    //std::memcpy(s,0,4);
+    }*/
+    //std::memcpy(s,"1234567",8);
 }
