@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <memory>
 #include "cryptmsg.h"
+#include "filehandle.h"
 
 #define USERSUCCESS         0
 #define USERFDREADFAIL      1 /*fd读取失败 */
@@ -56,6 +57,9 @@ private:
     transfPartner myinfo_;
     std::shared_ptr<cryptmsg> aescrpty_;
     char *crpty_;    /*用户登陆密码 */
+
+    size_t recpackagecount_;
+    size_t sendpackagecount_;
 };
 
 /*
@@ -79,6 +83,8 @@ public:
     //int LoadPartnerMap(); //没有必要所有的都进行加载，进行动态的增加用户和释放
     void UserRemove(int &tfd); //清楚用户
 
+    const std::shared_ptr<filehandle> GetFileHD();
+
 private:
 
     transfOnPer sendpacket_;
@@ -90,5 +96,8 @@ private: //能支持1千万的并发量就已经很不错了！
     std::unordered_map<size_t,std::shared_ptr<user> > idmapuser_; //管理当前所有的user，由user id 进行索引；
 
     std::shared_ptr<cryptmsg> rsacrpty_;
+
+    std::shared_ptr<filehandle> filehd_;
+
 };
 
