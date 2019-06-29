@@ -3,10 +3,11 @@
 #include "cryptmsg.h"
 #include "util.h"
 
-cryptmsg::cryptmsg(int a)
+cryptmsg::cryptmsg(const char* s,int len)
 {
     AcquireRsaPubKey();
-    AESGenEnCryptKey();
+    LOG::record(UTILLOGLEVELRECORD,"client server cryptmsg create : %s\n",s);
+  //  AESGenEnCryptKey();
 }
 
 cryptmsg::cryptmsg()  /*server端 */
@@ -16,7 +17,6 @@ cryptmsg::cryptmsg()  /*server端 */
 }
 cryptmsg::~cryptmsg()
 {
-
 }
 
 /*新建的aes的密码体系，使用解密进行初始化 */
@@ -70,9 +70,15 @@ int cryptmsg::AESCallEnCryptKey(std::string &m)
     //m.copy(aesenkey_);
 }
 
-int cryptmsg::AESGenEnCryptKey()
+int cryptmsg::AESGenEnCryptKey(char *s,int len)
 {
     aesenkey_.assign("16gr4eg");
+    std::string m="AESGenEnCryptKey";
+    if(len<m.size())
+    {
+        LOG::record(UTILLOGLEVELWORNNING, "AESGenEnCryptKey len : %d < local:%d", len,m.size());
+    }
+    m.copy(s,len);
 }
 
 
