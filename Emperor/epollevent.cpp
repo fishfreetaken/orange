@@ -79,7 +79,7 @@ int epollevent::EpollEventAdd(struct epoll_event &ee)
     ee.events |=  EPOLLIN | EPOLLET |EPOLLRDHUP;
     ee.data.fd=tfd;
     */
-    printf("epoll create fd: %d\n",ee.data.fd);
+    printf("epoll create %d\n",ee.data.fd);
     if(epoll_ctl(epollfd_,EPOLL_CTL_ADD,ee.data.fd,&ee)==-1)
     {
         LOG::record(UTILLOGLEVELERROR,"epoll create %d:%s\n",errno,strerror(errno));
@@ -97,6 +97,7 @@ int epollevent::EpollEventWaite()
 
     memset(ee_,0,sizeof(struct epoll_event)*EPOLLMAXEVENTS);
     int numReady=epoll_wait(epollfd_,ee_,EPOLLMAXEVENTS,objhandle_->WaitTimeOut());
+    //LOG::record(UTILLOGLEVELRECORD,"this epoll wait events numReady:%d\n",numReady);
     if(numReady<0)
     {
         LOG::record(UTILLOGLEVELERROR,"epoll_wait %d:%s\n",errno,strerror(errno));
@@ -122,7 +123,7 @@ int epollevent::EpollEventWaite()
             LOG::record(UTILLOGLEVELERROR,"epoll_wait fd:%d not known events %u\n",ee_[i].data.fd,ee_[i].events);
         }
     }
-    return 0;
+    return numReady;
 }
 
 int epollevent::EpollDelEvent(int fd)
@@ -146,18 +147,28 @@ int timeevent::TimeEventUpdate(size_t milliseconds,int fd)
 {
     /* 不管fd是否已经存在，都进行更新/添加新的时间事件*/
 
+    //LOG::record(UTILLOGLEVELRECORD,"%d TimeEventUpdate : milliseconds:%zu\n",fd,milliseconds);
     struct timeval tv;
 
     gettimeofday(&tv, NULL);
-    
-    tv.tv_usec += milliseconds * 1000;
-    tv.tv_sec += (milliseconds / 1000) + tv.tv_usec/1000000;
-    tv.tv_usec = tv.tv_usec %1000000;
+    //TimeShow(tv);
 
+    tv.tv_usec += milliseconds * 1000;
+    tv.tv_sec += tv.tv_usec/1000000;
+    tv.tv_usec = tv.tv_usec %1000000;
     ump_[fd] = tv;
+    //TimeShow(tv);
     return 0;
 }
 
+void timeevent::TimeShow( struct timeval &tv)
+{
+    printf("======TimeShow==start=====\n");
+    printf("usec:%ld\n",tv.tv_usec);
+    printf("sec:%ld\n",tv.tv_sec);
+    printf("======TimeShow==end=====\n");
+}
+/*这个应该使用一个lru算法进行剔除 */
 int timeevent::TimeEventProc(std::vector<int> &m)
 {
     //std::vector<int> m;
@@ -183,17 +194,17 @@ int timeevent::TimeExceedJudge(struct timeval &a,struct timeval &b)
 {
     if(a.tv_sec > b.tv_sec)
     {
-        return 0;
+        return 1;
     }else if(a.tv_sec < b.tv_sec)
     {
-        return 1;
+        return 0;
     }else{
-        if(a.tv_usec <= b.tv_usec)
+        if(a.tv_usec >= b.tv_usec)
         {
-            return 1;
+            return 0;
         }
     }
-    return 0;
+    return 1;
 }
 
 
