@@ -26,7 +26,7 @@
 #include <cstring>
 
 #include <sys/epoll.h>
-
+#include "protocal.h"
 #include "log.h"
 
 #define UTILNET_SUCCESS       0
@@ -35,9 +35,8 @@
 #define UIIL_NOTFOUND        -3
 
 
-
-#define SERVERLISTENIP    "192.168.1.105"
-#define SERVERLISTENPORT 8888
+#define SERVERLISTENIP    "10.8.49.62"
+#define SERVERLISTENPORT 45821
 
 int tcpGenericServer(const char *source_addr,int port);
 int tcpGenericConnect(const char *source_addr,int port,const char *dest_ip,int dest_port);
@@ -48,4 +47,8 @@ int readGenericReceive(int fd, char *buf,int len);
 //void printTransfOnPer(transfOnPer *m)
 
 //#endif
+
+void printTransfOnPer(transfOnPer *m,const char* from);
+void printfPartner(transfPartner *m,const char *from);
+
 
