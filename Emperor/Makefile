@@ -11,12 +11,12 @@ SERVER_CC=$(CXX) $(FINAL_CFLAGS)
 SUM_SERVER_NAME=server
 SUM_CLIENT_NAME=client
 SUM_MYSQL_NAME=mysqltest
-SUM_SERVER_OBJ= main.o util.o log.o cryptmsg.o genrandom.o epollserverhandle.o epollevent.o  channel.o 
-SUM_CLIENT_OBJ= clientmain.o util.o log.o clientuser.o epollevent.o
+SUM_SERVER_OBJ= main.o util.o log.o cryptmsg.o genrandom.o epollserverhandle.o epollevent.o  channel.o filehandle.o
+SUM_CLIENT_OBJ= clientmain.o util.o cryptmsg.o log.o clientuser.o epollevent.o
 SUM_MYSQL_OBJ= mysqltest.o genrandom.o
 
 all: $(SUM_SERVER_NAME) $(SUM_CLIENT_NAME)
-	@echo "chat server!"
+	@echo "sb"
 	@echo $(SERVER_CC) $(SUM_CLIENT_NAME)
 
 Makefile.dep:
