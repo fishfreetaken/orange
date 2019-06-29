@@ -13,7 +13,7 @@ public:
     */
     /*服务端直接先不初始化公钥，解密的时候再初始化 */
     cryptmsg(); /*初始化rsa非对称加密秘钥，客户端初始化pubkey */
-    cryptmsg(int a); /*初始化aes对称加密秘钥，输入一个解密的秘钥 */
+    cryptmsg(const char *s,int len); /*初始化aes对称加密秘钥，输入一个解密的秘钥 */
     ~cryptmsg();
 
     int AESDecrypt(const char* in,int size, char * packet);
@@ -24,7 +24,7 @@ public:
     int RSAEncrypt(const char* packet,int size,char *out );
 
    // int AESSetDecryptKey(std::string &in);  /*设置一个对阵加密的解密的秘钥 */
-    int AESGenEnCryptKey(); /*返回对阵加密的秘钥*/
+    int AESGenEnCryptKey(char *s,int len); /*生成一个对称加密的秘钥*/
     
 private:
     int AcquireRsaPubKey();  /*从第三方获取一个公共秘钥 */
