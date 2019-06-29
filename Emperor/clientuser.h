@@ -1,84 +1,42 @@
 
+//#include "protocal.h"
 
-#include "cryptmsg.h"
-#include "util.h"
+#include <string>
+#define CRYPTTYPERSA 1
 
-cryptmsg::cryptmsg(const char* s,int len)
-{
-    AcquireRsaPubKey();
-    LOG::record(UTILLOGLEVELRECORD,"client server cryptmsg create : %s\n",s);
-  //  AESGenEnCryptKey();
-}
+class cryptmsg{
 
-cryptmsg::cryptmsg()  /*server端 */
-{
-    AcquireRsaSecKey();
-    //AESGenEnCryptKey();
-}
-cryptmsg::~cryptmsg()
-{
-}
+public:
+    /* 
+        客户端和服务端都需要初始化对称加密和非对称加密的功能；
+        初始化时：先初始化一个非对称加密功能；
+    */
+    /*服务端直接先不初始化公钥，解密的时候再初始化 */
+    cryptmsg(); /*初始化rsa非对称加密秘钥，客户端初始化pubkey */
+    cryptmsg(const char *s,int len); /*初始化aes对称加密秘钥，输入一个解密的秘钥 */
+    ~cryptmsg();
 
-/*新建的aes的密码体系，使用解密进行初始化 */
-/*
-void cryptmsg::cryptmsg(std::string &aesdekey);
-{
-    aesdekey_.assign(aesdekey);
-}
-*/
+    int AESDecrypt(const char* in,int size, char * packet);
+    int AESEncrypt(const char* packet,int size,char *out);
 
-int cryptmsg::AcquireRsaPubKey()
-{
-    rsapubkey_.assign("123456778");
-}
+    /*从远程获取当前秘钥的私密，可以通过加密日期时间来区分秘钥 */
+    int RSADecrypt(const char* in,int size, char * packet);/*返回int的长度 */
+    int RSAEncrypt(const char* packet,int size,char *out );
 
-int cryptmsg::AcquireRsaSecKey()
-{
-    rsaseckey_.assign("123456778");
-}
+   // int AESSetDecryptKey(std::string &in);  /*设置一个对阵加密的解密的秘钥 */
+    int AESGenEnCryptKey(char *s,int len); /*生成一个对称加密的秘钥*/
+    
+private:
+    int AcquireRsaPubKey();  /*从第三方获取一个公共秘钥 */
+    int AcquireRsaSecKey();  /*预先在客户端内部加入一个公钥，使用文件配置私钥，从指定路径获取私钥*/
 
-int cryptmsg::AESDecrypt(const char* in,int size, char * packet)
-{
-    return 0;
-}
+    int AESCallEnCryptKey(std::string &m);   /*生成一个对称加密的秘钥 */
+private:
+    std::string aesdekey_; /*远端的 */
+    std::string aesenkey_; /*本地的 */
 
-int cryptmsg::AESEncrypt(const char* packet,int size,char *out )
-{
-    return 0;
-}
+    std::string rsapubkey_; /*有的只需要初始化一个aeskey就行 */
+    std::string rsaseckey_;
 
-int cryptmsg::RSADecrypt(const char* in,int size, char * packet)
-{
-    AcquireRsaSecKey();
-    return 0;
-}
-
-int cryptmsg::RSAEncrypt(const char* packet,int size,char *out )
-{
-    return 0;
-}
-
-/* 
-int cryptmsg::AESSetDecryptKey(std::string &m)
-{
-    aesdekey_.assign(m);
-}
-*/
-
-int cryptmsg::AESCallEnCryptKey(std::string &m)
-{
-    //m.copy(aesenkey_);
-}
-
-int cryptmsg::AESGenEnCryptKey(char *s,int len)
-{
-    aesenkey_.assign("16gr4eg");
-    std::string m="AESGenEnCryptKey";
-    if(len<m.size())
-    {
-        LOG::record(UTILLOGLEVELWORNNING, "AESGenEnCryptKey len : %d < local:%d", len,m.size());
-    }
-    m.copy(s,len);
-}
-
+};
 
