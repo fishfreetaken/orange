@@ -181,7 +181,8 @@ int user::GenericSend(const uint32_t id,const size_t &dest,const char*buf,int si
     sendpacket_.to=dest;
 
     std::memcpy(sendpacket_.buf,buf,size);
-    sendpacket_.crc32=12345678;
+
+    genCrcPayload(sendpacket_);
 
     int ret=0;
 
@@ -332,6 +333,13 @@ int channel::UserReadProtocl(int tfd)
         if(sendpacket_.id!=MSGSECRET)
         {/*非法连接消息，虽然可以正常解密，但是没有进行私钥的协商，还是不通 */
             LOG::record(UTILLOGLEVELRECORD,"readGenericReceive sendpacket_.id： %d not MSGSECRET",sendpacket_.id);
+            return USERBUFDECRYPTFAIL;
+        }
+
+        /*crc校验 */
+        if(verifyCrcPayload(sendpacket_)!=USERSUCCESS)
+        {
+            LOG::record(UTILLOGLEVELRECORD,"readGenericReceive crc query failed");
             return USERBUFDECRYPTFAIL;
         }
 

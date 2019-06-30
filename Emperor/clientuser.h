@@ -45,8 +45,6 @@ private:
 
     void UserSendMsgPoll();
 
-    void CalculateCrc(transfOnPer *p);
-
     transfOnPer * SendBufferPush();
     transfOnPer * SendBufferPop();
 

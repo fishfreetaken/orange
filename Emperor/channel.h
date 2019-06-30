@@ -9,7 +9,7 @@
 
 #define USERSUCCESS         0
 #define USERFDREADFAIL      1 /*fd读取失败 */
-#define USERBUFDECRYPTFAIL  2 /*包解密失败 */
+#define USERBUFDECRYPTFAIL  2 /*包解密失败 ,或者crc校验错误*/
 #define USERNEWFAIL         3 /*开辟内存失败 */
 #define USERIDMISMATCH      4 /*与本人id并不相等 */
 #define USERNOTMYFIREND     5 /*朋友中并没有找到这个人 */

@@ -45,6 +45,7 @@
         "typeinfo": "cpp",
         "utility": "cpp",
         "queue": "cpp",
-        "cstring": "cpp"
+        "cstring": "cpp",
+        "rand.h": "c"
     }
 }

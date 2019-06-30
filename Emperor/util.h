@@ -35,7 +35,7 @@
 #define UIIL_NOTFOUND        -3
 
 
-#define SERVERLISTENIP    "10.8.49.62"
+#define SERVERLISTENIP    "192.168.1.105"
 #define SERVERLISTENPORT 45821
 
 int tcpGenericServer(const char *source_addr,int port);
@@ -51,4 +51,5 @@ int readGenericReceive(int fd, char *buf,int len);
 void printTransfOnPer(transfOnPer *m,const char* from);
 void printfPartner(transfPartner *m,const char *from);
 
-
+int verifyCrcPayload(transfOnPer &m);
+int genCrcPayload(transfOnPer &m);

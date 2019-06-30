@@ -129,6 +129,13 @@ void epollclienthandle::AcceptEvent(int fd)
     recpackagecount_++;
 
     printTransfOnPer(p, "epollclienthandle AcceptEvent");
+
+    /*crc校验，这样校验不过应该需要从server端断开连接的 */
+    if(verifyCrcPayload(*p)!=UTILNET_SUCCESS)
+    {
+        LOG::record(UTILLOGLEVELRECORD,"epollclienthandle::AcceptEvent crc query failed");
+        return ;
+    }
     
     switch(p->id)
     {
@@ -266,6 +273,7 @@ int epollclienthandle::MsgSendFromStd0()
     {
         return ret;
     }
+    
     FormMsgAddToBuffer(MSGFRIEND,readbuffer_,ret);
 }
 
@@ -293,7 +301,8 @@ int epollclienthandle::FormMsgAddToBuffer(uint32_t msgid,const char*buf,int len)
         memcpy(p->buf,buf,len);
     }
     
-    CalculateCrc(p);
+    genCrcPayload(*p);
+
     return UTILNET_SUCCESS;
 }
 
@@ -332,21 +341,4 @@ transfOnPer * epollclienthandle::SendBufferPop()
     transfOnPer * p= &sendbuffer_[send_pos_end_];
 
     return p;
-}
-
-void epollclienthandle::CalculateCrc(transfOnPer *p)
-{
-    if(p==nullptr)
-    {
-        LOG::record(UTILLOGLEVELERROR,"CalculateCrc p is nullptr\n");
-        return ;
-    }
-    p->crc32=12345678;
-    /*
-    char *s=p->crc32;
-    if(s==nullptr)
-    {   
-        LOG::record(UTILLOGLEVELERROR,"CalculateCrc s is nullptr\n");
-    }*/
-    //std::memcpy(s,"1234567",8);
 }

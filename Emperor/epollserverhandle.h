@@ -10,7 +10,6 @@ public:
     listen_fd_(-1),
     timeout_(timeout)
     {
-        printf("epollserverhandle creat timeout_ %d\n",timeout_);
     }
 
     ~epollserverhandle();
