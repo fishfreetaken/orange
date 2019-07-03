@@ -75,7 +75,7 @@ int filehandle::GetResult(std::vector<transfPartner> &p,size_t &uid)
 {
     if((msvs_.find(uid)==msvs_.end())||(mst_.find(uid)==mst_.end()))
     {
-        LOG::record(UTILLOGLEVELERROR,"%s not found %zu",__FUNCTION__,uid);
+        LOG::record(UTILLOGLEVELERROR,"func:%s not found %zu",__FUNCTION__,uid);
         return GENERALNOTFOUND;
     }
     int ret=0;
@@ -212,5 +212,10 @@ void filehandle::LineProcess()
         msvs_[p.uid].emplace_back(std::stoll(sct));
         cc +=ret;
     }
+    if(msvs_.find(p.uid)==msvs_.end())
+    {
+        msvs_[p.uid];
+    }
     mst_[p.uid]=p;
 }
+

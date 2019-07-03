@@ -55,7 +55,7 @@ int epollclienthandle::StartConnect(const char* listenip,int port)
         return UTILNET_ERROR;
     }
     setNonBlock(fd_);
-    LOG::record(UTILLOGLEVELWORNNING, "tcpGenericConnect server fd: %d", fd_);
+    LOG::record(UTILLOGLEVELWORNNING, "tcpGenericConnect to server uid: %zu", uid_);
 
     try
     {

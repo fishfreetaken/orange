@@ -1,0 +1,20 @@
+channel.o: channel.cpp channel.h protocal.h cryptmsg.h filehandle.h \
+ util.h genrandom.h log.h
+clientmain.o: clientmain.cpp util.h genrandom.h protocal.h log.h \
+ clientuser.h epollevent.h cryptmsg.h openssl.h
+clientuser.o: clientuser.cpp clientuser.h protocal.h epollevent.h \
+ cryptmsg.h util.h genrandom.h log.h
+cryptmsg.o: cryptmsg.cpp cryptmsg.h util.h genrandom.h protocal.h log.h
+epollevent.o: epollevent.cpp util.h genrandom.h protocal.h log.h \
+ epollevent.h
+epollserverhandle.o: epollserverhandle.cpp channel.h protocal.h \
+ cryptmsg.h filehandle.h epollserverhandle.h epollevent.h util.h \
+ genrandom.h log.h
+filehandle.o: filehandle.cpp filehandle.h protocal.h util.h genrandom.h \
+ log.h
+genrandom.o: genrandom.cpp genrandom.h log.h
+log.o: log.cpp log.h
+main.o: main.cpp util.h genrandom.h protocal.h log.h epollserverhandle.h \
+ epollevent.h
+mysqltest.o: mysqltest.cpp util.h genrandom.h protocal.h log.h
+util.o: util.cpp util.h genrandom.h protocal.h log.h

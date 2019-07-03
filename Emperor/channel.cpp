@@ -248,8 +248,9 @@ int user::InitialMyInfo(transfOnPer &m,transfPartner &s, channel *p)
     /*应该从db上捞取自己(应包含自己的信息)以及朋友的信息，并进行通知*/
     //LoadUserInfoFromDb(uid_,fri);
     int ret = p->GetFileHD()->GetResult(fri,uid_);
-    if(ret<=0)
+    if(ret<0)
     {
+        LOG::record(UTILLOGLEVELRECORD,"GetResult failed ret=%d",__FUNCTION__,ret);
         return USERNOTINITIALZE;
     }
 
@@ -362,6 +363,7 @@ int channel::UserReadProtocl(int tfd)
         ret=fdmapuser_[tfd]->InitialMyInfo(sendpacket_,master,this); /*sendpacket_ 包中需要包含AES秘钥，个人密码信息 */
         if(ret!=USERSUCCESS)
         {
+            LOG::record(UTILLOGLEVELRECORD,"InitialMyInfo failed %d",ret);
             return USERNOTINITIALZE;
         }
 
