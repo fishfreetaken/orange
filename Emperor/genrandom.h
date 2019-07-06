@@ -14,10 +14,11 @@ public:
 
     double GenRealNum();
 
-
     int GenStrDigit(size_t n,std::string &m);
     int GenStrFloatDi(size_t n, std::string &m);
     int GenStrEnLetter(size_t n, std::string &m);
+
+    int GenStrEnLetter(size_t n, char *in);
     std::string GenStrEnLetter(size_t n);
 
     int GenStrEnLeDigit(size_t n,std::string *m);
