@@ -54,25 +54,49 @@ int epollclienthandle::StartConnect(const char* listenip,int port)
         //LOG::record(UTILLOGLEVELERROR, "tcpGenericConnect : %s", strerror(errno));
         return UTILNET_ERROR;
     }
+
     setNonBlock(fd_);
-    LOG::record(UTILLOGLEVELWORNNING, "tcpGenericConnect to server uid: %zu", uid_);
+    LOG::record(UTILLOGLEVELWORNNING, "tcpGenericConnect server fd: %d", fd_);
 
     try
     {
         evp_=std::make_shared<epollevent>(this,fd_);
         tme_=std::make_shared<timeevent>();
-        crypt_=std::make_shared<cryptmsg>();
+        crypt_=std::make_shared<cryptmsg>("./rsapub.pem");
     }catch (...){
         throw  strerror(errno);
     }
 
     /*加密协议消息 */
-    transfcrptykey key;
-    std::memset(&key,0,sizeof(key));
+    transfOnPer st;
+    std::memset(&st,0,STRUCTONPERLEN);
+    transfcrptykey *key=(transfcrptykey*)st.buf;
+    std::memset(key,0,sizeof(transfcrptykey));
 
-    crypt_->AESGenEnCryptKey(key.key,LOADAESCRPTYKEYLEN);
-    snprintf(key.secret,LOADPERSONCRTPYLEN,"dadonggeSecret");
-    FormMsgAddToBuffer(MSGSECRET,(char*)&key,sizeof(key));
+
+    crypt_->AESGenEnCryptKey((unsigned char*)key->key,0);
+
+    snprintf(key->secret,LOADPERSONCRTPYLEN,"dadonggeSecret");/*这个地方后边要用md5 */
+    st.id=MSGSECRET;
+    st.uid=uid_;
+
+    genCrcPayload(st);
+
+    printTransfOnPer(&st,"StartConnect");
+
+    int ret=crypt_->RSAEncrypt((unsigned char*)&st,STRUCTONPERLEN,(unsigned char*)serverbuffer_,CLIENTWRITEBUFFERLEN);
+    if(ret<RSAENCRYPTBUFLEN)
+    {
+        GENERRORPRINT("RSAEncrypt failed!",ret,RSAENCRYPTBUFLEN);
+        return UTILNET_ERROR;
+    }
+    
+    ret=writeGenericSend(fd_,serverbuffer_,ret);
+    if(ret<=0)
+    {
+        GENERRORPRINT("writeGenericSend",ret,0);
+        return UTILNET_ERROR;
+    }
 
     tme_->TimeEventUpdate(1500,fd_);
 
@@ -84,10 +108,10 @@ int epollclienthandle::StartConnect(const char* listenip,int port)
 
     evp_->EpollEventAdd(ee);
 
-    int ret=0;
+    ret=0;
     while(1)
     {
-        UserSendMsgPoll(); //先将个人信息写入发送至服务端获取个人信息；
+        //UserSendMsgPoll(); //先将个人信息写入发送至服务端获取个人信息；
 
         ret=evp_->EpollEventWaite();//程序主入口，设置的轮训时间是1s，跳出来之后进行发送心跳包
         if(ret<0)
@@ -111,23 +135,24 @@ void epollclienthandle::AcceptEvent(int fd)
     int ret=0;
 
     std::memset(serverbuffer_,0,CLIENTREADBUFFERLEN);
-    ret=readGenericReceive(fd_,serverbuffer_,STRUCTONPERLEN); 
+    ret=readGenericReceive(fd_,serverbuffer_,STRUCTONPERLEN);
     if(ret<STRUCTONPERLEN)
     {
         /*这里应该将buf内容进行二进制的输出到log上 */
         LOG::record(UTILLOGLEVELWORNNING, "readGenericReceive %s LINE:%d  ret:%d < %d",__FUNCTION__,__LINE__,ret,STRUCTONPERLEN);
         return;
     }
-    #if 0
-    ret=Decrypt() ; //使用密码进行解压；
+    transfOnPer *p=&recvpacketbuf_;
+    ret=crypt_->AESDecrypt((unsigned char*)serverbuffer_,ret,(unsigned char*)p,STRUCTONPERLEN);
     if(ret!=0)
     {
-        LOG::record(UTILLOGLEVELERROR, "decrypt failed! disregard msg ");
+        GENERRORPRINT("AESDecrypt failed",ret,0);
+        return ;
     }
-    #endif
-    transfOnPer *p=(transfOnPer *)serverbuffer_;
+
     recpackagecount_++;
 
+    printf("recpackagecount_ :%zu  sendpackagecount_%zu\n",recpackagecount_,sendpackagecount_);
     printTransfOnPer(p, "epollclienthandle AcceptEvent");
 
     /*crc校验，这样校验不过应该需要从server端断开连接的 */
@@ -136,7 +161,7 @@ void epollclienthandle::AcceptEvent(int fd)
         LOG::record(UTILLOGLEVELRECORD,"epollclienthandle::AcceptEvent crc query failed");
         return ;
     }
-    
+
     switch(p->id)
     {
         case MSGHEART:
@@ -212,7 +237,7 @@ void epollclienthandle::InintialMyInfo(transfOnPer *p)
         return ;
     }
     transfPartner *cc= (transfPartner *)p->buf;
-    printfPartner(cc,"InintialMyInfo");
+    //printfPartner(cc,"InintialMyInfo");
     if(cc->uid==uid_)
     {
         myinfo_.state=1;
@@ -285,23 +310,49 @@ int epollclienthandle::FormMsgAddToBuffer(uint32_t msgid,const char*buf,int len)
         LOG::record(UTILLOGLEVELERROR, "FormMsgAddToBuffer msgid:1 and curdialog_ not initilized! cannot send");
         return UIIL_NOTFOUND;
     }*/
-    transfOnPer *p= SendBufferPush();
-    if(p==nullptr)
+    /*应该检测一下msgid是否有效 */
+    if(len>LOADCHARLEN)
+    {
+        GENERRORPRINT("len not more",len,LOADCHARLEN);
+        return UTILNET_ERROR;
+    }
+    //transfOnPer *out= SendBufferPush();
+    unsigned char out[1024]={0};
+    transfOnPer p;
+    
+    if(out==nullptr)
     {
         LOG::record(UTILLOGLEVELERROR, "FormMsgAddToBuffer SendBufferPush full");
         return UTIL_POINTER_NULL;
     }
     sendpackagecount_++;
-    p->id=msgid;
-    p->uid=uid_;
-    p->to=curdialog_;
-    p->size=len;
+    p.id=msgid;
+    p.uid=uid_;
+    p.to=curdialog_;
+    p.size=len;
+
     if(buf!=nullptr)
     {
-        memcpy(p->buf,buf,len);
+        memcpy(p.buf,buf,len);
     }
-    
-    genCrcPayload(*p);
+
+    genCrcPayload(p);
+    printTransfOnPer(&p,"FormMsgAddToBuffer");
+
+    int ret=crypt_->AESEncrypt((unsigned char*)&p,STRUCTONPERLEN,(unsigned char*)&out,STRUCTONPERLEN);
+
+    if(ret!=0)
+    {
+        GENERRORPRINT("RSAEncrypt error",ret,0);
+        return UTILNET_ERROR;
+    }
+    ret=writeGenericSend(fd_,(char*)out, STRUCTONPERLEN);
+    if(ret<=0)
+    {
+        GENERRORPRINT("writeGenericSend error",ret,0);;
+    }
+    //transfOnPer*t= SendBufferPush();
+    //std::memcpy(t,out,STRUCTONPERLEN);
 
     return UTILNET_SUCCESS;
 }
