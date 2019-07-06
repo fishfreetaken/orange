@@ -1,7 +1,7 @@
 
 
-//#ifdef UTIL_HEADER_
-//#define UTIL_HEADER_
+#ifndef UTIL_HEADER_
+#define UTIL_HEADER_
 
 
 #include <sys/types.h>
@@ -35,7 +35,7 @@
 #define UIIL_NOTFOUND        -3
 
 
-#define SERVERLISTENIP    "192.168.1.105"
+#define SERVERLISTENIP    "10.8.51.106"
 #define SERVERLISTENPORT 45821
 
 int tcpGenericServer(const char *source_addr,int port);
@@ -46,10 +46,16 @@ int readGenericReceive(int fd, char *buf,int len);
 
 //void printTransfOnPer(transfOnPer *m)
 
-//#endif
 
 void printTransfOnPer(transfOnPer *m,const char* from);
 void printfPartner(transfPartner *m,const char *from);
 
 int verifyCrcPayload(transfOnPer &m);
 int genCrcPayload(transfOnPer &m);
+
+void hexprint(unsigned char *str,int len);
+
+/*return UTILNET_SUCCESS valid */
+int checkMsgIdValid(uint32_t t);
+
+#endif
