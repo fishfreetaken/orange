@@ -121,16 +121,18 @@ int user::ParsePacket(int fd)
 {
     int ret=0;
     ret=readGenericReceive(fd,(char *)&recvpacket_,STRUCTONPERLEN);
-    if(ret<=0)
+    if(ret<STRUCTONPERLEN)
     {
         LOG::record(UTILLOGLEVELERROR,"user::ParsePacket ret: %d",ret);
         return USERFDREADFAIL;
     }
     recpackagecount_++;
 
-    printTransfOnPer(&recvpacket_,__FUNCTION__);
+    //printTransfOnPer(&recvpacket_,"decrypt before");
 
-    ret=aescrpty_->AESDecrypt((char *)&recvpacket_,ret,(char *)&recvpacket_);
+    ret=aescrpty_->AESDecrypt((unsigned char *)&recvpacket_,STRUCTONPERLEN,(unsigned char *)&recvpacket_,STRUCTONPERLEN);
+
+    printTransfOnPer(&recvpacket_,"decrypt after");
 
     #if 0
     if((uid_==0)&&(recvpacket_.fd!=0))
@@ -184,6 +186,8 @@ int user::GenericSend(const uint32_t id,const size_t &dest,const char*buf,int si
 
     genCrcPayload(sendpacket_);
 
+    printTransfOnPer(&sendpacket_,"GenericSend");
+
     int ret=0;
 
     if(aescrpty_==nullptr)
@@ -193,13 +197,13 @@ int user::GenericSend(const uint32_t id,const size_t &dest,const char*buf,int si
     }
 
     /*输入 */
-    ret=aescrpty_->AESEncrypt((char*)&sendpacket_,STRUCTONPERLEN,(char*)&sendpacket_);
+    ret=aescrpty_->AESEncrypt((unsigned char*)&sendpacket_,STRUCTONPERLEN,(unsigned char*)&sendpacket_,STRUCTONPERLEN);
     if(ret!=0)
     {
         LOG::record(UTILLOGLEVELRECORD,"%s AESEncrypt failed ret=%d",__FUNCTION__,ret);
+        return ret;
     }
 
-    printTransfOnPer(&sendpacket_,"GenericSend");
     ret=writeGenericSend(fd_,(char*)&sendpacket_,STRUCTONPERLEN);
 
     if(ret>0)
@@ -233,7 +237,7 @@ int user::InitialMyInfo(transfOnPer &m,transfPartner &s, channel *p)
     //LOG::record(UTILLOGLEVELRECORD,"line:%d %s begin",__LINE__,__FUNCTION__);
     uid_=m.uid;
     transfcrptykey *l= (transfcrptykey*)m.buf;
-    std::memcpy(crpty_,l->secret,LOADPERSONCRTPYLEN);
+    std::memcpy(crpty_,l->secret,LOADPERSONCRTPYLEN);/*用户名密码匹配完就不要了也行 */
     //std::memcpy(key_,l->key,LOADAESCRPTYKEYLEN);
     memcpy(&myinfo_,&s,STRUCTONFRILEN); //拷贝自身的信息，可有可无；
 
@@ -248,9 +252,8 @@ int user::InitialMyInfo(transfOnPer &m,transfPartner &s, channel *p)
     /*应该从db上捞取自己(应包含自己的信息)以及朋友的信息，并进行通知*/
     //LoadUserInfoFromDb(uid_,fri);
     int ret = p->GetFileHD()->GetResult(fri,uid_);
-    if(ret<0)
+    if(ret<=0)
     {
-        LOG::record(UTILLOGLEVELRECORD,"GetResult failed ret=%d",__FUNCTION__,ret);
         return USERNOTINITIALZE;
     }
 
@@ -273,12 +276,17 @@ int user::InitialMyInfo(transfOnPer &m,transfPartner &s, channel *p)
 channel::channel()
 {
     try{
-        rsacrpty_=std::make_shared<cryptmsg>(); /*new出来一个rsa加密的实体 */
+        rsacrpty_=std::make_shared<cryptmsg>("asdf",1); /*new出来一个rsa加密的实体 */
         filehd_=std::make_shared<filehandle>();
+        rsarecvbuf_ = new unsigned char[MAX_BUF_LEN];
     }catch(...)
     {
         throw "new channel error!";
     }
+}
+channel::~channel()
+{
+    delete [] rsarecvbuf_;
 }
 
 const std::shared_ptr<filehandle> channel::GetFileHD()
@@ -318,19 +326,21 @@ int channel::UserReadProtocl(int tfd)
     if(fdmapuser_.find(tfd)==fdmapuser_.end())
     {
         /*新加入连接的一个客户端，执行协议解析，先验证是一个合法的连接 */
-        ret=readGenericReceive(tfd,(char*)&sendpacket_,STRUCTONPERLEN);
-        if(ret<=0)
+        std::memset(rsarecvbuf_,0,MAX_BUF_LEN);
+        ret=readGenericReceive(tfd,(char*)rsarecvbuf_,RSAENCRYPTBUFLEN);
+        if(ret<0)
         {
             LOG::record(UTILLOGLEVELRECORD,"readGenericReceive failed %d",ret);
             return USERFDREADFAIL;
         }
-        printTransfOnPer(&sendpacket_,"UserReadProtocl");
-        ret=rsacrpty_->RSADecrypt((char*)&sendpacket_,STRUCTONPERLEN,(char*)&sendpacket_);
-        if(ret!=0)
+
+        ret=rsacrpty_->RSADecrypt(rsarecvbuf_,RSAENCRYPTBUFLEN,(unsigned char*)&sendpacket_,STRUCTONPERLEN);
+        if(ret!=STRUCTONPERLEN)
         {
-            LOG::record(UTILLOGLEVELRECORD,"readGenericReceive failed %d",ret);
+            GENERRORPRINT("RSADecrypt failed",ret,0);
             return USERBUFDECRYPTFAIL;
         }
+        printTransfOnPer(&sendpacket_,"UserReadProtocl");
         if(sendpacket_.id!=MSGSECRET)
         {/*非法连接消息，虽然可以正常解密，但是没有进行私钥的协商，还是不通 */
             LOG::record(UTILLOGLEVELRECORD,"readGenericReceive sendpacket_.id： %d not MSGSECRET",sendpacket_.id);
@@ -343,7 +353,7 @@ int channel::UserReadProtocl(int tfd)
             LOG::record(UTILLOGLEVELRECORD,"readGenericReceive crc query failed");
             return USERBUFDECRYPTFAIL;
         }
-
+        
         transfPartner master; /*获取个人信息 */
         ret=CheckUidIsInDb(sendpacket_,master); /*从db中直接捞取数据，如果找到就创建一个新的user类，验证用户名密码,防止不合法连接浪费资源 */
         if(ret!=USERSUCCESS)
@@ -363,7 +373,6 @@ int channel::UserReadProtocl(int tfd)
         ret=fdmapuser_[tfd]->InitialMyInfo(sendpacket_,master,this); /*sendpacket_ 包中需要包含AES秘钥，个人密码信息 */
         if(ret!=USERSUCCESS)
         {
-            LOG::record(UTILLOGLEVELRECORD,"InitialMyInfo failed %d",ret);
             return USERNOTINITIALZE;
         }
 
