@@ -39,7 +39,7 @@ id 意义
 #define LOADPERSONLEN 44
 #define LOADPERSONSIGNLEN 100
 
-#define LOADAESCRPTYKEYLEN 120
+#define LOADAESCRPTYKEYLEN 300
 #define LOADPERSONCRTPYLEN 40
 
 typedef struct tarnsfercrptykeypacket{
@@ -67,5 +67,7 @@ typedef struct transferOnlinePersion{
 
 #define STRUCTONPERLEN  sizeof(transfOnPer)
 #define STRUCTONFRILEN  sizeof(transfPartner)
+
+#define RSAENCRYPTBUFLEN 768 //128*6  STRUCTONPERLEN/86=6;
 
 #endif
