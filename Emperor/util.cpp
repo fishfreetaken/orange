@@ -159,7 +159,8 @@ int writeGenericSend(int fd,const char * buf,int len)
     }
     return re;
 }
-
+/*网络中的单包长度 */
+#define TRANSACTIONLENNET 480
 
 int readGenericReceive(int fd, char* buf,int len)
 {
@@ -190,6 +191,14 @@ int readGenericReceive(int fd, char* buf,int len)
     return ret;
 }
 
+int checkMsgIdValid(uint32_t t)
+{
+    if(t>MSGFRIENDINFO)
+    {
+        return UTILNET_ERROR;
+    }
+    return UTILNET_SUCCESS;
+}
 
 void printTransfOnPer(transfOnPer *m,const char* from)
 {
@@ -374,6 +383,16 @@ int genCrcPayload(transfOnPer &m)
     return UTILNET_SUCCESS;
 }
 
+
+void hexprint(unsigned char *str,int len)
+{
+    int i=0;
+    for(i=0;i<len;i++){
+        printf("%s%02x%s",((i%16==0?"|":"")),*((unsigned char*)str+i),(((i+1)%16==0)?"|\n":" "));
+    }
+    //if(i%16!=0)
+    printf("|len=%d\n",len);
+}
 
 
 
