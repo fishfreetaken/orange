@@ -1,6 +1,6 @@
 FINAL_CFLAGS=-W -std=c++11 $(DEBUG) 
 
-DYNAMIC_INLUDE=-lpthread -lssl -lcrypto
+DYNAMIC_INLUDE=-lpthread -lcrypto -lssl
 
 MYSQL_CONCPP_DIR =`mysql_config --cflags`
 MYSQL_CPPFLAGS = `mysql_config --libs`
@@ -31,7 +31,7 @@ Makefile.dep:
 -include Makefile.dep
 
 $(SUM_SERVER_NAME): $(SUM_SERVER_OBJ)
-	$(SERVER_CC) -o $@ $^
+	$(SERVER_CC) -o $@ $^ $(DYNAMIC_INLUDE)
 
 $(SUM_CLIENT_NAME): $(SUM_CLIENT_OBJ) 
 	$(SERVER_CC) -o $@ $^ $(DYNAMIC_INLUDE)
