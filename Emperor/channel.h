@@ -68,6 +68,7 @@ private:
 class channel{
 public:
     channel();
+    ~channel();
 
     //static channel* GetInstance();
 
@@ -88,6 +89,7 @@ public:
 private:
 
     transfOnPer sendpacket_;
+    unsigned char *rsarecvbuf_; /*1024 bytes */
 
 
 private: //能支持1千万的并发量就已经很不错了！
