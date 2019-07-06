@@ -1,0 +1,12 @@
+1 搞了两天的rsa，有一个大大的坑，终于在某个网站看到解决方案了，就是在传入的加密字符太长了：
+“
+不用 google ， man RSA_public_encrypt 即可。
+RSA_PKCS1_PADDING 模式下，明文长度 < rsa_len - 1
+”
+说明啥：在加密的时候一定要预留出来一定的空间，传入的char的长度要小于开辟的长度，否则总是会报出一大堆错误。
+例如：   140241510639520:error:0406D06E:lib(4):func(109):reason(110):rsa_pk1.c:151
+        139937856018336:error:0407906E:lib(4):func(121):reason(110):rsa_oaep.c:45:
+        补充 2019-07-04 这个原因是由于RSA_R_DATA_TOO_LARGE_FOR_KEY_SIZE，也就是说对于能加密的字符长度有限制，一般是（输出密文长度-21*2）
+
+
+2 2019-07-04 由于 RSA_free(rsa);提前释放了rsa，导致后边进行压缩时候，找不到句柄，导致程序coredump
