@@ -79,7 +79,16 @@ uint GenRandomKey::GenAUIntDigit(int f)
     return (uint)(*unif)(*gen);
 }
 
-
+int GenRandomKey::GenStrEnLetter(size_t n, char *in)
+{
+    std::string s;
+    int ret=GenStrEnLetter(n,s);
+    for(size_t i=0;i<s.size();i++)
+    {
+        *(in+i)=s[i];
+    }
+    printf("GenStrEnLetter create size:%d\n",s.size());
+}
 
 int GenRandomKey::GenStrEnLetter(size_t n, std::string &m)
 {
@@ -91,6 +100,7 @@ int GenRandomKey::GenStrEnLetter(size_t n, std::string &m)
     GenericStringGen(n,m,enst);
     return n;
 }
+
 std::string GenRandomKey::GenStrEnLetter(size_t n)
 {
     std::string m;
