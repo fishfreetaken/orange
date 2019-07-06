@@ -5,8 +5,8 @@
 #include "cryptmsg.h"
 #include <memory>
 
-#define  CLIENTREADBUFFERLEN  512
-#define  CLIENTWRITEBUFFERLEN 512
+#define  CLIENTREADBUFFERLEN  1024
+#define  CLIENTWRITEBUFFERLEN 1024
 
 #define VECTORBUFFERLEN 50
 
@@ -60,6 +60,8 @@ private :
 
     char *readbuffer_;
     char *serverbuffer_;
+    
+    transfOnPer recvpacketbuf_;
 
     //int recv_pos_begin_;
     //int recv_pos_end_;
