@@ -5,6 +5,7 @@
 
 
 //#define MAXIUMBUFLEN 256
+#define VECTRESIZEPACTSIZE 20
 
 /*epoll 创建的根据fd创建的一个user类*/
 user::user(int fd,size_t uid):
@@ -21,22 +22,27 @@ sendpackagecount_(0)
     {
         throw std::string("user new failed fd:") + std::to_string(fd);
     }
+
+    
+    vecrecvpackcc_.resize(VECTRESIZEPACTSIZE,0);
 }
 
 user::~user()
 {
+    /* 
     for(auto it=partnermap_.begin();it!=partnermap_.end();it++)
     {
         if(it->second!=nullptr)
         {
             it->second->InformPartnerOnline(this,0); 
         }
-    }
+    }*/
 }
 
 int user::SendTo()
 {
     transfOnPer *info= &recvpacket_;
+    printTransfOnPer(&recvpacket_,"SendToPartner");
 
     if(partnermap_.find(info->to)==partnermap_.end())
     {
@@ -47,7 +53,7 @@ int user::SendTo()
 
     if(partnermap_[info->to]==nullptr)
     {
-        LOG::record(UTILLOGLEVELRECORD,"SendTo friend %zu not online ",info->to);
+        LOG::record(UTILLOGLEVELRECORD,"SendTo friend %zu not online send equape",info->to);
         //投递到消息队列，等待上线进行处理，同时写数据库；
         return 0;
     }
@@ -59,6 +65,7 @@ int user::SendTo()
 
 int user::SendMyself(const transfOnPer *info)
 {
+    
     if(info==NULL)
     {
         LOG::record(UTILLOGLEVELERROR,"%s para is NULL",__FUNCTION__);
@@ -69,19 +76,19 @@ int user::SendMyself(const transfOnPer *info)
         LOG::record(UTILLOGLEVELERROR,"%s uid mismatch %zu",__FUNCTION__,info->to);
         return USERIDMISMATCH;
     }
-    //BufferCryptCrc();//测试的时候进行不处理加密功能，保留接口
     //SendMsgKeepDb(); //写数据库buffer
-    GenericSend(info->id,info->to,info->buf, STRUCTONPERLEN,info->uid);
+    GenericSend(info);
 }
 
 size_t user::SendToAll()
 {
-    transfOnPer *info= &recvpacket_;
+    //transfOnPer *info= &recvpacket_;
+    printTransfOnPer(&recvpacket_,"SendToAll");
     int ret=0;
     size_t cc=0;
     for(auto i :partnermap_)
     {
-        ret=i.second->SendMyself(info);
+        ret=i.second->SendMyself(&recvpacket_);
         if(ret==0)
         {
             cc++;
@@ -90,12 +97,16 @@ size_t user::SendToAll()
     return cc;
 }
 
-size_t user::GetUid()
+size_t user::GetUid() const
 {
     return uid_;
 }
+int user::GetFd() const
+{
+    return fd_;
+}
 
-int user::InformPartnerOnline(user *handle, const size_t state)
+int user::InformPartnerOnline( user *handle, const size_t state)
 {
     size_t tuid=handle->GetUid();
 
@@ -120,34 +131,41 @@ int user::InformPartnerOnline(user *handle, const size_t state)
 int user::ParsePacket(int fd)
 {
     int ret=0;
+while(1)
+{//不知道为啥用这个会跑飞
+
     ret=readGenericReceive(fd,(char *)&recvpacket_,STRUCTONPERLEN);
-    if(ret<STRUCTONPERLEN)
+    //printf("ParsePacket while 1 ret=%d\n",ret);
+    if((ret<STRUCTONPERLEN)||(ret<0))
     {
-        LOG::record(UTILLOGLEVELERROR,"user::ParsePacket ret: %d",ret);
+        if ((errno == EINTR)||(errno == EAGAIN)||(ret==0))
+        {
+            //LOG::record(UTILNET_ERROR,"%s LINE:%d readfail:%s \n",__FUNCTION__,__LINE__,strerror(errno));
+            return 0;
+        }
+        LOG::record(UTILLOGLEVELERROR,"user::ParsePacket ret: %d fd=%d uid=%zu",ret,fd_,uid_);
         return USERFDREADFAIL;
     }
-    recpackagecount_++;
 
-    //printTransfOnPer(&recvpacket_,"decrypt before");
-
+    //LOG::record(UTILLOGLEVELERROR,"user::ParsePacket2 ret: %d fd=%d uid=%zu",ret,fd_,uid_);
+#ifdef NEEDAESCRYPT
     ret=aescrpty_->AESDecrypt((unsigned char *)&recvpacket_,STRUCTONPERLEN,(unsigned char *)&recvpacket_,STRUCTONPERLEN);
-
-    printTransfOnPer(&recvpacket_,"decrypt after");
-
-    #if 0
-    if((uid_==0)&&(recvpacket_.fd!=0))
+#endif
+    if(verifyCrcPayload(recvpacket_)!=USERSUCCESS)
     {
-        /*还没有从文件或者数据库中进行加载uid配置信息，不能进行处理消息 */
-        LOG::record(UTILLOGLEVELERROR,"uid_ not initilzed NotFoundUid uid:%zu",recvpacket_.fd);
-        return USERNOTINITIALZE;
+        LOG::record(UTILLOGLEVELRECORD,"readGenericReceive ParsePacket crc query failed");
+        printTransfOnPer(&recvpacket_,"verifyCrcPayload ParsePacket");
+        return ret;
     }
-    #endif
 
     if((recvpacket_.uid!=uid_)||(recvpacket_.uid==0))
     {
-        LOG::record(UTILLOGLEVELERROR,"user::ParsePacket uid is mismatch: remote:%zu local:%zu",recvpacket_.uid,uid_);
+        LOG::record(UTILLOGLEVELERROR,"user::ParsePacket uid is mismatch: remote:%zu uid:%zu",recvpacket_.uid,uid_);
+        printTransfOnPer(&recvpacket_,"decrypt after");
         return USERIDMISMATCH;
     }
+
+    recpackagecount_++;
 
     switch (recvpacket_.id)
     {
@@ -169,12 +187,42 @@ int user::ParsePacket(int fd)
             return USERFAILED;
             break;
     }
-
+    vecrecvpackcc_[recvpacket_.id]++;
+}
     return USERSUCCESS;
 }
 
-int user::GenericSend(const uint32_t id,const size_t &dest,const char*buf,int size,size_t from)
+int user::GenericSend(const transfOnPer*info )
 {
+    if(info==nullptr)
+    {
+        GENERRORPRINT("info is null",0,0);
+        return USERPOINTNULL;
+    }
+    int ret=0;
+    std::memcpy(&sendpacket_,info,STRUCTONPERLEN);
+#ifdef NEEDAESCRYPT
+    ret=aescrpty_->AESEncrypt((unsigned char*)&sendpacket_,STRUCTONPERLEN,(unsigned char*)&sendpacket_,STRUCTONPERLEN);
+    if(ret!=0)
+    {
+        LOG::record(UTILLOGLEVELRECORD,"%s AESEncrypt failed ret=%d",__FUNCTION__,ret);
+        return ret;
+    }
+#endif
+    ret=writeGenericSend(fd_,(char*)&sendpacket_,STRUCTONPERLEN);
+    if(ret==STRUCTONPERLEN)
+    {
+        sendpackagecount_++;
+        //printf("GenericSend writeGenericSend ret=%d  STRUCTONFRILEN=%d\n",ret,STRUCTONPERLEN);
+    }else{
+        GENERRORPRINT("send failed",ret,uid_);
+    }
+    return ret;
+}
+
+int user::GenericSend(const uint32_t id,const size_t &dest,const char*buf,size_t size,size_t from)
+{
+
     std::memset(&sendpacket_,0,STRUCTONPERLEN);
 
     sendpacket_.id=id;
@@ -186,7 +234,7 @@ int user::GenericSend(const uint32_t id,const size_t &dest,const char*buf,int si
 
     genCrcPayload(sendpacket_);
 
-    printTransfOnPer(&sendpacket_,"GenericSend");
+    //printTransfOnPer(&sendpacket_,"GenericSend");
 
     int ret=0;
 
@@ -195,7 +243,7 @@ int user::GenericSend(const uint32_t id,const size_t &dest,const char*buf,int si
         LOG::record(UTILLOGLEVELERROR,"%s aescrpty_ is null",__FUNCTION__,ret);
         return USERPOINTNULL;
     }
-
+#ifdef NEEDAESCRYPT
     /*输入 */
     ret=aescrpty_->AESEncrypt((unsigned char*)&sendpacket_,STRUCTONPERLEN,(unsigned char*)&sendpacket_,STRUCTONPERLEN);
     if(ret!=0)
@@ -203,20 +251,36 @@ int user::GenericSend(const uint32_t id,const size_t &dest,const char*buf,int si
         LOG::record(UTILLOGLEVELRECORD,"%s AESEncrypt failed ret=%d",__FUNCTION__,ret);
         return ret;
     }
-
+#endif
     ret=writeGenericSend(fd_,(char*)&sendpacket_,STRUCTONPERLEN);
-
-    if(ret>0)
+    if(ret==STRUCTONPERLEN)
     {
         sendpackagecount_++;
         //printf("GenericSend writeGenericSend ret=%d  STRUCTONFRILEN=%d\n",ret,STRUCTONPERLEN);
+    }else{
+        GENERRORPRINT("send failed",ret,uid_);
+    }
+    return ret;
+}
+
+void user::CurrentStat()
+{
+    printf("fd=%d uid:%zu recpackagecount_ :%zu  sendpackagecount_%zu\n",fd_,uid_,recpackagecount_,sendpackagecount_);
+
+    for(size_t i=0;i<VECTRESIZEPACTSIZE;i++)
+    {
+        if(vecrecvpackcc_[i]==0)
+        {
+            continue;
+        }
+        //printf("%zu --> %zu\n",i,vecrecvpackcc_[i]);
     }
 }
 
 void user::HeartBeat()
 {
-    //printTransfOnPer(&sendpacket_,"ReceiveHeartBeat");
-    GenericSend(MSGHEART,uid_,nullptr,0,0);
+    printf("recvpacket_ client HeartBeat num: %zu\n",*recvpacket_.buf);
+    GenericSend(MSGHEART,uid_,recvpacket_.buf,sizeof(size_t),0);
 }
 
 int user::LoadUserInfoFromDb(size_t &uid, std::vector<transfPartner>& p)
@@ -232,9 +296,8 @@ int user::LoadUserInfoFromDb(size_t &uid, std::vector<transfPartner>& p)
     return 1; //没朋友
 }
 
-int user::InitialMyInfo(transfOnPer &m,transfPartner &s, channel *p)
+int user::InitialMyInfo(transfOnPer &m,transfPartner &s,const channel *p)
 {
-    //LOG::record(UTILLOGLEVELRECORD,"line:%d %s begin",__LINE__,__FUNCTION__);
     uid_=m.uid;
     transfcrptykey *l= (transfcrptykey*)m.buf;
     std::memcpy(crpty_,l->secret,LOADPERSONCRTPYLEN);/*用户名密码匹配完就不要了也行 */
@@ -250,25 +313,24 @@ int user::InitialMyInfo(transfOnPer &m,transfPartner &s, channel *p)
 
     std::vector<transfPartner> fri;
     /*应该从db上捞取自己(应包含自己的信息)以及朋友的信息，并进行通知*/
-    //LoadUserInfoFromDb(uid_,fri);
     int ret = p->GetFileHD()->GetResult(fri,uid_);
-    if(ret<=0)
+    if(ret<0)
     {
         return USERNOTINITIALZE;
     }
 
-    printf("InitialMyInfo Debug fri:%d\n",fri.size());
+    printf("InitialMyInfo Debug fd=%d uid=%zu friend:%d\n",fd_,uid_,fri.size());
 
     GenericSend(MSGSERVERINFO,uid_,(char*)&s,STRUCTONFRILEN,0); /*返回数据给客户端，握手完成，如果客户端收不到再进行请求*/
     for(size_t i=0;i<fri.size();i++)
     {
-        GenericSend(MSGSERVERINFO,uid_,(char*)&fri[i],STRUCTONFRILEN,0);
-
         partnermap_[fri[i].uid]=p->FindByUid(fri[i].uid);
         if(partnermap_[fri[i].uid]!=nullptr)
         {
-            partnermap_[fri[i].uid]->InformPartnerOnline(this,1); //uid进行通知就行
+            printf("partnermap_ is not null!\n");
+            //partnermap_[fri[i].uid]->InformPartnerOnline(this,1); //uid进行通知就行
         }
+        GenericSend(MSGSERVERINFO,uid_,(char*)&fri[i],STRUCTONFRILEN,0);
     }
     return USERSUCCESS;
 }
@@ -277,7 +339,7 @@ channel::channel()
 {
     try{
         rsacrpty_=std::make_shared<cryptmsg>("asdf",1); /*new出来一个rsa加密的实体 */
-        filehd_=std::make_shared<filehandle>();
+        filehd_=std::make_shared<filehandle>(FRIENDFILEPATH);
         rsarecvbuf_ = new unsigned char[MAX_BUF_LEN];
     }catch(...)
     {
@@ -289,9 +351,23 @@ channel::~channel()
     delete [] rsarecvbuf_;
 }
 
-const std::shared_ptr<filehandle> channel::GetFileHD()
+const std::shared_ptr<filehandle> channel::GetFileHD() const
 {
     return filehd_;
+}
+
+void channel::ServerStatPrint()
+{
+    printf("------current state--------\n");
+    for(auto i:idmapuser_)
+    {
+        if(i.second==nullptr)
+        {
+            printf("uid:%zu ",i.first);
+        }else{
+            i.second->CurrentStat();
+        }
+    }
 }
 
 int channel::CheckUidIsInDb(transfOnPer &m,transfPartner &s)
@@ -321,45 +397,53 @@ int channel::UserReadProtocl(int tfd)
 {
     /*new a thread to decode c */
     /*通知对应user进行处理，并接收结果 */
-    int ret= USERSUCCESS;
+    int ret= tfd;
    // LOG::record(UTILLOGLEVELRECORD,"UserReadProtocl parse %d",tfd);
     if(fdmapuser_.find(tfd)==fdmapuser_.end())
     {
         /*新加入连接的一个客户端，执行协议解析，先验证是一个合法的连接 */
         std::memset(rsarecvbuf_,0,MAX_BUF_LEN);
-        ret=readGenericReceive(tfd,(char*)rsarecvbuf_,RSAENCRYPTBUFLEN);
-        if(ret<0)
+        int len=readGenericReceive(tfd,(char*)rsarecvbuf_,RSAENCRYPTBUFLEN);
+        if(len<RSAENCRYPTBUFLEN)
         {
-            LOG::record(UTILLOGLEVELRECORD,"readGenericReceive failed %d",ret);
-            return USERFDREADFAIL;
+            LOG::record(UTILLOGLEVELRECORD,"readGenericReceive failed %d",len);
+            return ret;
         }
 
-        ret=rsacrpty_->RSADecrypt(rsarecvbuf_,RSAENCRYPTBUFLEN,(unsigned char*)&sendpacket_,STRUCTONPERLEN);
-        if(ret!=STRUCTONPERLEN)
+        len=rsacrpty_->RSADecrypt(rsarecvbuf_,RSAENCRYPTBUFLEN,(unsigned char*)&sendpacket_,STRUCTONPERLEN);
+        if(len!=STRUCTONPERLEN)
         {
-            GENERRORPRINT("RSADecrypt failed",ret,0);
-            return USERBUFDECRYPTFAIL;
+            GENERRORPRINT("RSADecrypt failed",ret,tfd);
+            return ret;
         }
-        printTransfOnPer(&sendpacket_,"UserReadProtocl");
+        //printTransfOnPer(&sendpacket_,"UserReadProtocl");
         if(sendpacket_.id!=MSGSECRET)
         {/*非法连接消息，虽然可以正常解密，但是没有进行私钥的协商，还是不通 */
             LOG::record(UTILLOGLEVELRECORD,"readGenericReceive sendpacket_.id： %d not MSGSECRET",sendpacket_.id);
-            return USERBUFDECRYPTFAIL;
+            return ret;
         }
 
         /*crc校验 */
         if(verifyCrcPayload(sendpacket_)!=USERSUCCESS)
         {
             LOG::record(UTILLOGLEVELRECORD,"readGenericReceive crc query failed");
-            return USERBUFDECRYPTFAIL;
+            return ret;
         }
-        
+
         transfPartner master; /*获取个人信息 */
         ret=CheckUidIsInDb(sendpacket_,master); /*从db中直接捞取数据，如果找到就创建一个新的user类，验证用户名密码,防止不合法连接浪费资源 */
         if(ret!=USERSUCCESS)
         {
             LOG::record(UTILLOGLEVELRECORD,"CheckUidIsInDb failed %d",ret);
-            return USERIDMISMATCH;
+            return ret;
+        }
+
+        if(idmapuser_.find(master.uid)!=idmapuser_.end())
+        {/*这边涉及到如果同一个uid连入后的处理，鉴定权限？新连接的有效，将老的连接释放，只能存在一个有效连接 */
+            
+            ret= idmapuser_[master.uid]->GetFd();
+            UserRemove(ret);
+            GENERRORPRINT("idental uid",ret,master.uid);
         }
 
         try{
@@ -370,24 +454,25 @@ int channel::UserReadProtocl(int tfd)
         }
 
         idmapuser_[master.uid]=fdmapuser_[tfd];
-        ret=fdmapuser_[tfd]->InitialMyInfo(sendpacket_,master,this); /*sendpacket_ 包中需要包含AES秘钥，个人密码信息 */
-        if(ret!=USERSUCCESS)
+        len=fdmapuser_[tfd]->InitialMyInfo(sendpacket_,master,this); /*sendpacket_ 包中需要包含AES秘钥，个人密码信息 */
+        if(len!=USERSUCCESS)
         {
-            return USERNOTINITIALZE;
+            GENERRORPRINT("InitialMyInfo failed",master.uid,tfd);
+            return ret;
         }
-
     }else{
         /*user交给一个已存在user进行协议包处理 */
         ret = fdmapuser_[tfd]->ParsePacket(tfd); //解析协议包并应答
         if(ret<0)
         {
             /*设定一个定时时间，lru 超时的话进行删除 */
-            UserRemove(tfd);
+            return tfd;
             /*协议解析失败，无效链接，关闭端口 */
         }
     }
+    ServerStatPrint();
 
-    return ret;
+    return USERSUCCESS;
 }
 
 void channel::UserRemove(int &tfd)
@@ -398,15 +483,20 @@ void channel::UserRemove(int &tfd)
         return;
     }
     auto its=idmapuser_.find(it->second->GetUid());
+    if(its==idmapuser_.end())
+    {
+        GENERRORPRINT("remove not valid",tfd,it->second->GetUid());
+        return ;
+    }
 
-    LOG::record(UTILLOGLEVELRECORD,"%s LINE:%d %x %x",__FUNCTION__,__LINE__,it,its);
+    LOG::record(UTILLOGLEVELRECORD,"func:%s LINE:%d fd=%d uid=%zu",__FUNCTION__,__LINE__,tfd,it->second->GetUid());
 
     idmapuser_.erase(its);
-
     fdmapuser_.erase(it);
+
 }
 
-std::shared_ptr<user> channel::FindByUid(size_t&uid)
+std::shared_ptr<user> channel::FindByUid(size_t&uid) const
 {
     auto it= idmapuser_.find(uid);
     if(it==idmapuser_.end())

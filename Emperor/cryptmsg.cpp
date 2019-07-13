@@ -33,18 +33,17 @@ aeskeylen_(256)
     ret=sprintf((char*)iv_,"jofjwoiiewi23");
     ret=sprintf((char*)passwd_,PASSWORDKEY);
 
-    LOG::record(UTILLOGLEVELRECORD,"client cryptmsg create \n");
+    //LOG::record(UTILLOGLEVELRECORD,"client cryptmsg create \n");
     AcquireRsaPubKey();
 }
 
 cryptmsg::cryptmsg(const char* s,size_t len):  /*server 初始化一个aes秘钥 */
 rsakeyfile_("./rsapriv.pem"), /*private key */
 evprsakey_(nullptr), 
-aeskeylen_(256),
-aeskey_(s)
+aeskeylen_(256)
 {
-
-    LOG::record(UTILLOGLEVELRECORD,"server cryptmsg create \n");
+    aeskey_.assign(s,aeskeylen_);
+    //LOG::record(UTILLOGLEVELRECORD,"server cryptmsg create \n");
     std::memset(iv_,0,MAX_BLOCK_SIZE);
     std::memset(passwd_,0,MAX_BLOCK_SIZE);
 
@@ -145,11 +144,18 @@ int cryptmsg::AESGenEnCryptKey(unsigned char *out,int ctl)
 {
     if(ctl==0)
     {
-        RAND_bytes(out, aeskeylen_);
+        int ret=RAND_bytes(out, aeskeylen_);
+        //GENERRORPRINT("rand generate aes failed",ret,ctl);
+        if(ret<=0)
+        {
+            return -1;
+        }
         aeskey_.assign((char*)out,aeskeylen_);
+        //GENERRORPRINT("random gen aes init",aeskey_.size(),strlen((char*)out));
         return 0;
     }
-    
+
+    //ctl=256
     aeskey_.assign((char*)out,ctl);
     #if 0
     /* 公司的版本有点老啊，要不换一下？*/
