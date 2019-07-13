@@ -7,8 +7,8 @@
 int main()
 {
     #if 0
-        //cryptmsg tmp;
-        //tmp.GenerateKeyFiles("./rsapub.pem","./rsapriv.pem");
+        cryptmsg tmp;
+        tmp.GenerateKeyFiles("./rsapub.pem","./rsapriv.pem");
 //client:
         transfOnPer send;
         std::memset(&send,0,STRUCTONPERLEN);

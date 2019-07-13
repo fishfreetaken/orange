@@ -100,6 +100,35 @@ int GenRandomKey::GenStrEnLetter(size_t n, std::string &m)
     GenericStringGen(n,m,enst);
     return n;
 }
+//std::chrono
+std::string GenRandomKey::GenADate()
+{
+    uint32_t year=1974+GenAUIntDigit(44);
+    uint32_t month=GenAUIntDigit(13);
+    if(month==0)
+    {
+        month++;
+    }
+    uint32_t day;
+    if(month==2)
+    {
+        day=GenAUIntDigit(29);
+    }else{
+        switch(month){
+            case 4:
+            case 6:
+            case 9:
+            case 11:
+            day=GenAUIntDigit(31);
+                break;
+            default:
+                day=GenAUIntDigit(32);
+                break;
+        }
+    }
+    return std::to_string(year)+std::to_string(month)+std::to_string(day);
+    
+}
 
 std::string GenRandomKey::GenStrEnLetter(size_t n)
 {

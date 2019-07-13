@@ -35,7 +35,7 @@
 #define UIIL_NOTFOUND        -3
 
 
-#define SERVERLISTENIP    "10.8.51.106"
+#define SERVERLISTENIP    "192.168.1.105"
 #define SERVERLISTENPORT 45821
 
 int tcpGenericServer(const char *source_addr,int port);

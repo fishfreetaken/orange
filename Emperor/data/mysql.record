@@ -1,0 +1,12 @@
+
+对于mysql的设计：
+userinfo： uid 个人密码（SHA1进行散列） 创建时间 个性的名字 个性签名 性别 生日 年龄 电话 电子邮件 （所在地区（国家） 省 地区 （这个以国内的34个省地区进行编号）） 血型
+
+create table userinfo(U_ID int unsigned primary key not null AUTO_INCREMENT, U_PassWord char(160), U_CREATIME DATETIME not null default now(), U_NickName varchar(50),U_SignaTure varchar(300),
+U_Sex char(1) ,U_BirthDay DATE null,U_Name varchar(30), U_Age TINYINT unsigned, U_Telephone varchar(30), U_Email varchar(30),U_Nation TINYINT unsigned,U_Province TINYINT unsigned ,U_City TINYINT unsigned,
+U_BloodType varchar(2),U_UserStateID TINYINT, U_FriendPolicyQuestion varchar(30) ,U_FriendPolicyAnswer varchar(30),U_FriendPolicyPassword char(160)
+);
+
+insert into userinfo(null,"ksajfkjsakfjlka",null,"mingming","ahovhxov","1","2019-04-05","mneg",25,"17328714547","wewejl@sina.com",1,2,3,"B",1,"I am funny","yes","fkoewok");
+
+diaglog1 diaglog2 diaglog3

@@ -152,7 +152,7 @@ void epollclienthandle::AcceptEvent(int fd)
 
     recpackagecount_++;
 
-    printf("recpackagecount_ :%zu  sendpackagecount_%zu\n",recpackagecount_,sendpackagecount_);
+    printf("uid:%zu recpackagecount_ :%zu  sendpackagecount_%zu\n",uid_,recpackagecount_,sendpackagecount_);
     printTransfOnPer(p, "epollclienthandle AcceptEvent");
 
     /*crc校验，这样校验不过应该需要从server端断开连接的 */

@@ -29,6 +29,8 @@ public:
     int GenAIntDigit();
     uint32_t GenAUIntDigit(int f);
 
+    std::string GenADate();
+
 private:
     int GenericStringGen(size_t n,std::string &m, std::string &mod);
 

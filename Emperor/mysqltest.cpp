@@ -12,6 +12,7 @@ std::string namelist[]={
     "kexiaolan"
 };
 
+
 void selectmytablesum(const char* tt,struct timeval t1)
 {
     MYSQL mysql;
