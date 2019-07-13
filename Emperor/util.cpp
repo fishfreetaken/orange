@@ -43,10 +43,11 @@ int tcpGenericServer(const char *source_addr,int port)
 
     if (setResusedConfig(socket_fd)<0)
     {
+        LOG::record(UTILLOGLEVELERROR,"setResusedConfig error : %s",strerror(errno));
         goto error;
     }
     
-    //setNonBlock(socket_fd);
+    setNonBlock(socket_fd);
 
     if(bind(socket_fd,servinfo->ai_addr,servinfo->ai_addrlen)==-1)
     {
@@ -154,7 +155,7 @@ int writeGenericSend(int fd,const char * buf,int len)
     int re=write(fd,buf,len);
     if (re<=0)
     {
-        LOG::record(UTILLOGLEVELERROR, "fd:%d %s error : %s",fd,__FUNCTION__, strerror(errno));
+        LOG::record(UTILLOGLEVELERROR, "fd:%d %s error %d : %s",fd,__FUNCTION__,errno,strerror(errno));
         return UTILNET_ERROR;
     }
     return re;
@@ -178,15 +179,15 @@ int readGenericReceive(int fd, char* buf,int len)
         {
             if ((errno == EINTR)||(errno == EAGAIN))
             {
-                LOG::record(UTILNET_ERROR,"%s LINE:%d readfail:%s \n",__FUNCTION__,__LINE__,strerror(errno));
+                //LOG::record(UTILNET_ERROR,"%s LINE:%d readfail:%s \n",__FUNCTION__,__LINE__,strerror(errno));
                 return ret;
             }else{
-                LOG::record(UTILNET_ERROR,"%s LINE:%d readfail:%s \n",__FUNCTION__,__LINE__,strerror(errno));
+                LOG::record(UTILNET_ERROR,"%s readfail %d:%s \n",__FUNCTION__,errno,strerror(errno));
                 return UTILLOGLEVELERROR; 
             }
         }
         break;
-    }while(1);
+    }while(0);
 
     return ret;
 }
@@ -199,14 +200,21 @@ int checkMsgIdValid(uint32_t t)
     }
     return UTILNET_SUCCESS;
 }
+//#define NONPRINTONEPERCTL 1
 
 void printTransfOnPer(transfOnPer *m,const char* from)
 {
+    #ifdef NONPRINTONEPERCTL
+        return ;
+        if(m->id==MSGHEART)
+        {
+            return;
+        }
+    #endif
     /* 这边可以将心跳包进行过滤*/
-    if(m->id==MSGHEART)
-    {
-        return;
-    }
+
+    
+
     printf("=====transfOnPer===from:=====%s=====\n",from);
 
     printf("id=%u\n",m->id);
