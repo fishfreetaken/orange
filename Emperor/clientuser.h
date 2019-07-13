@@ -35,7 +35,7 @@ public:
     int WaitTimeOut();
 
 private:
-    int FormMsgAddToBuffer(uint32_t msgid,const char*buf,int len);
+    int FormMsgAddToBuffer(uint32_t msgid,const char*buf,int len,size_t to);
     int MsgSendFromStd0();
 
 
@@ -43,10 +43,14 @@ private:
     void AddNewFriends(transfOnPer *p);
     void InintialMyInfo(transfOnPer *p);
 
-    void UserSendMsgPoll();
+    int UserSendMsgPoll();
 
     transfOnPer * SendBufferPush();
-    transfOnPer * SendBufferPop();
+    int SendBufferPop();
+    //transfOnPer *SendBufferPop();
+
+    void ShowPacketInfo();
+    //void SingalCallBack(int t);
 
 private :
     int fd_;
@@ -78,6 +82,10 @@ private :
 
     size_t recpackagecount_;
     size_t sendpackagecount_;
+
+    uint32_t sendfailedcount_;
+
+    size_t heart_count_;
 };
 
 
