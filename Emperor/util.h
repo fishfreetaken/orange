@@ -38,6 +38,8 @@
 #define SERVERLISTENIP    "10.8.51.106"
 #define SERVERLISTENPORT 45821
 
+#define NEEDAESCRYPT
+
 int tcpGenericServer(const char *source_addr,int port);
 int tcpGenericConnect(const char *source_addr,int port,const char *dest_ip,int dest_port);
 void setNonBlock(int socket_fd);
