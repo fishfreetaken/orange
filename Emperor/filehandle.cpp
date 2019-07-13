@@ -1,4 +1,5 @@
 #include "filehandle.h"
+#include "genrandom.h"
 
 #include "util.h"
 #include <cstring>
@@ -17,8 +18,10 @@ filehandle::filehandle(const char *filename)
     ParseFile();
 }
 
-filehandle::filehandle()
+filehandle::filehandle():
+cbuf_(nullptr)
 {
+    /*
     try{
         cbuf_=new char[FILECBUFNUM];
         pifm=std::make_shared<std::ifstream>(FRIENDFILEPATH,std::ios::in);
@@ -28,6 +31,7 @@ filehandle::filehandle()
     }
 
     ParseFile();
+    */
 }
 
 
@@ -36,8 +40,8 @@ filehandle::~filehandle()
     if(cbuf_!=nullptr)
     {
         delete [] cbuf_;
+        pifm->close();
     }
-    pifm->close();
 }
 
 void filehandle::ParseFile()
@@ -52,23 +56,23 @@ void filehandle::ParseFile()
         LineProcess();
         memset(cbuf_,0,FILECBUFNUM);
     }
-#if 0
-    for(auto i : msvs_)
-    {
-        printf("uid %zu : ",i.first);
-        for(auto j: i.second)
+    #if 0
+        for(auto i : msvs_)
         {
-            printf(" %zu ",j);
+            printf("uid %zu : ",i.first);
+            for(auto j: i.second)
+            {
+                printf(" %zu ",j);
+            }
+            printf("\n");
         }
-        printf("\n");
-    }
-    printf("file load user :\n");
-    for(auto it :mst_)
-    {
-        printf("uid %zu : \n",it.first);
-        printfPartner(&it.second,"filehandle::ParseFile");
-    }
-    printf("============end============");
+        printf("file load user :\n");
+        for(auto it :mst_)
+        {
+            printf("uid %zu : \n",it.first);
+            printfPartner(&it.second,"filehandle::ParseFile");
+        }
+        printf("============end============");
     #endif
 }
 
@@ -207,7 +211,7 @@ void filehandle::LineProcess()
     char sct[20];
     cc=0;
     int ret=0;
-    
+    msvs_[p.uid];
     while ((ret=LineFilterSpace(ctmp+cc,sct,20))>0)
     {
         msvs_[p.uid].emplace_back(std::stoll(sct));
@@ -215,3 +219,33 @@ void filehandle::LineProcess()
     }
     mst_[p.uid]=p;
 }
+
+
+void filehandle::GenUserInfo(int num,const char *filename)
+{
+    FILE * fp;
+
+    fp=fopen(filename,"w+");
+
+    if(num<=0)
+    {
+        num=1024;
+    }
+    char name[20]={0};
+    char signature[50]={0};
+    GenRandomKey m(1,16);
+    GenRandomKey s(1,42);
+    GenRandomKey k;
+
+    for(int i=1;i<=num;i++)
+    {
+        std::memset(name,0,20);
+        std::memset(signature,0,20);
+        m.GenStrEnLetter(m.GenAUIntDigit(0),name);
+        s.GenStrEnLetter(s.GenAUIntDigit(0),signature);
+        fprintf(fp,"\"%s\" \"%s\" \"%s\" \"%s\"\n",std::to_string(i).c_str(),name,signature,std::to_string(k.GenAUIntDigit(num)).c_str());
+    }
+
+    fclose(fp);
+}
+
