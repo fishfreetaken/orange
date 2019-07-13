@@ -46,11 +46,10 @@ int epollserverhandle::ServerStart(const char* listenip,const int port)
             LOG::record(UTILLOGLEVELERROR, "TimeEventProc timeout %d",i);
             //DelEvent(i);
         }
-        
     }
-
     return 0;
 }
+
 
 void epollserverhandle::AcceptEvent(int listenfd)
 {
@@ -61,52 +60,52 @@ void epollserverhandle::AcceptEvent(int listenfd)
     }
 
     int tfd=0;
+while(1)
+{
     struct sockaddr m;
     socklen_t flag=1;
-    do{
-        tfd=accept(listen_fd_,&m,&flag);
-        if(tfd==-1)
+
+    tfd=accept(listen_fd_,&m,&flag);
+    if(tfd<0)
+    {
+        if ((errno == EINTR)||(errno == EAGAIN))
         {
-            if ((errno == EINTR)||(errno == EAGAIN))
-            {
-                continue;
-            }else{
-                LOG::record(UTILLOGLEVELERROR,"%s accept:%s \n",__FUNCTION__,strerror(errno));
-                return; 
-            }
+            //LOG::record(UTILLOGLEVELERROR,"%s accept null:%s \n",__FUNCTION__,strerror(errno));
+            return;
+        }else{
+            LOG::record(UTILLOGLEVELERROR,"%s accept:%s \n",__FUNCTION__,strerror(errno));
+            return; 
         }
-        break;
-    }while(1);
+    }
 
     LOG::record(UTILLOGLEVELRECORD,"AcceptEvent event %d",tfd);
 
     setNonBlock(tfd);
     struct epoll_event ee = {0,0};
-    ee.events |=  EPOLLIN | EPOLLET |EPOLLRDHUP;
+    ee.events |=  EPOLLIN | EPOLLRDHUP | EPOLLET;
     ee.data.fd=tfd;
 
     if(evp_->EpollEventAdd(ee)==0)
     {
         /*添加定时事件，超时后将自动关闭该 端口*/
-        //chm_->AddNewUser(tfd);
         tme_->TimeEventUpdate(timeeventout_,tfd);//注册时间事件，如果超时没有连接的话需要清楚断开该连接
     }
+}
 }
 
 void epollserverhandle::ReadEvent(int tfd)
 {
     /*将fd传递给下层的协议处理函数进行读取处理，还是说在上层进行一定的校验 */
     //LOG::record(UTILLOGLEVELRECORD,"ReadEvent event %d",tfd);
-    if(chm_->UserReadProtocl(tfd)!=0)  //进行协议解析处理，考虑使用线程池进行处理，快速的进行切换,对于某些错误放在一个队列中进行集中处理
+
+    int ret=chm_->UserReadProtocl(tfd);
+    if(ret!=0)  //进行协议解析处理，考虑使用线程池进行处理，快速的进行切换,对于某些错误放在一个队列中进行集中处理
     { //如果协议被有效的解析后，可以设置心跳时间
-        DelEvent(tfd);//如果解析处理后出错，直接断开删除该连接
+        DelEvent(ret);//如果解析处理后出错，直接断开删除该连接
        //tme_->TimeEventUpdate(timeout_,tfd);//更新注册时间，否则将进行断开，同时用于心跳检测！
     }else{
         tme_->TimeEventUpdate(timeeventout_,tfd);
     }
-    //else{ //不合法的连接及时关闭连接
-    //    
-    //}
 }
 
 void epollserverhandle::DelEvent(int tfd)
