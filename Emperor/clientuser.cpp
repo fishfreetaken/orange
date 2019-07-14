@@ -22,6 +22,7 @@ heart_count_(0)
     {
         throw strerror(errno);
     }
+    
     sendbuffer_.resize(VECTORBUFFERLEN);
     timerollback_.resize(VECTORBUFFERLEN);
     //recvbuffer_.resize(VECTORBUFFERLEN);
@@ -40,7 +41,7 @@ epollclienthandle::~epollclienthandle()
 
 int epollclienthandle::WaitTimeOut()
 {
-    return 5000;
+    return 300;
 }
 
 void SingalCallBack(int signale_number)
@@ -67,7 +68,7 @@ int epollclienthandle::StartConnect(const char* listenip,int port)
     sendfailedcount_=0;
 
     setNonBlock(fd_);
-    LOG::record(UTILLOGLEVELWORNNING, "tcpGenericConnect server fd: %d uid:%zu", fd_,uid_);
+    //LOG::record(UTILLOGLEVELWORNNING, "tcpGenericConnect server fd: %d uid:%zu", fd_,uid_);
 
     try
     {
@@ -91,8 +92,6 @@ int epollclienthandle::StartConnect(const char* listenip,int port)
     st.uid=uid_;
 
     genCrcPayload(st);
-
-    //printTransfOnPer(&st,"StartConnect");
 
     int ret=crypt_->RSAEncrypt((unsigned char*)&st,STRUCTONPERLEN,(unsigned char*)serverbuffer_,CLIENTWRITEBUFFERLEN);
     if(ret<RSAENCRYPTBUFLEN)
@@ -121,6 +120,7 @@ int epollclienthandle::StartConnect(const char* listenip,int port)
     //signal(SIGPIPE,SingalCallBack);
     /*当主控断开后，会由于SIGPIPE信号导致进程中断，这个也是断线重连机制的基础 */
     signal(SIGPIPE,SIG_IGN);
+    std::memset(&myinfo_,0,STRUCTONFRILEN);
 
     ret=0;
     while(1)
@@ -131,6 +131,11 @@ int epollclienthandle::StartConnect(const char* listenip,int port)
             LOG::record(UTILLOGLEVELWORNNING, "EpollEventWaite LINE=%d error ret=%d\n",__LINE__,ret);
             break;
         }
+        if(myinfo_.state==0)
+        {
+            //printf("myinfo_.state==0\n");
+            continue;
+        }
 
         ret=tme_->TimeEventProc(timerollback_);
         if(ret>0)
@@ -138,7 +143,6 @@ int epollclienthandle::StartConnect(const char* listenip,int port)
             tme_->TimeEventUpdate(1500,fd_);
             //向server发送
             heart_count_++;
-            printf("server send heart :%zu\n",heart_count_);
             FormMsgAddToBuffer(MSGHEART,(char*)&heart_count_,sizeof(size_t),0);//1s发送一个心跳包
         }
 
@@ -165,8 +169,12 @@ while(1)/*一次并不能读完 */
     {
         /*ret=0表示对端已经断开 */
         /*这里应该将buf内容进行二进制的输出到log上 */
-        //LOG::record(UTILLOGLEVELWORNNING, "readGenericReceive %s LINE:%d  ret:%d errno=%d", strerror(errno),__LINE__,ret,errno);
-        return;
+        if((errno == EINTR)||(errno == EAGAIN))
+        {
+            break;
+        }
+        LOG::record(UTILLOGLEVELWORNNING, "readGenericReceive %s LINE:%d  ret:%d errno=%d", strerror(errno),__LINE__,ret,errno);
+        break;
     }
 
     transfOnPer *p=&recvpacketbuf_;
@@ -181,29 +189,27 @@ while(1)/*一次并不能读完 */
         std::memcpy(&recvpacketbuf_,serverbuffer_,STRUCTONPERLEN);
     #endif
 
-    recpackagecount_++;
-
-    ShowPacketInfo();
-
     /*crc校验，这样校验不过应该需要从server端断开连接的 */
     if(verifyCrcPayload(*p)!=UTILNET_SUCCESS)
     {
         LOG::record(UTILLOGLEVELRECORD,"epollclienthandle::AcceptEvent crc query failed uid:%zu",uid_);
-        printTransfOnPer(p, "epollclienthandle AcceptEvent");
+        printTransfOnPer(p, "AcceptEvent crc query failed");
         return ;
     }
 
     if(p->to!=uid_)
     {
-        printTransfOnPer(p, "epollclienthandle AcceptEvent");
+        printTransfOnPer(p, "AcceptEvent UID mismatch");
         LOG::record(UTILLOGLEVELERROR, "zero dest uid, invalid! to:%zu",p->to);
         return ;
     }
 
+    recpackagecount_++;
+
     switch(p->id)
     {
         case MSGHEART:
-            printf("Server reback num %zu\n",*(p->buf));
+            //printf("Server reback num %zu\n",*(p->buf));
             break;
         case MSGFRIEND:
             PushMsgToTerminal(p);
@@ -220,11 +226,22 @@ while(1)/*一次并不能读完 */
             break;
     }
 }
+ShowPacketInfo();
 }
 
 void epollclienthandle::ShowPacketInfo()
 {
-    printf("uid:%zu recpackagecount_ :%zu  sendpackagecount_ :%zu \n",uid_,recpackagecount_,sendpackagecount_);
+    static size_t locount=0;
+    if((recpackagecount_!=(sendpackagecount_+2)))
+    {
+        printf("uid:%zu recpackagecount_ :%zu  sendpackagecount_ :%zu locount=%zu\n",uid_,recpackagecount_,sendpackagecount_,locount);
+
+    }else if(locount==recpackagecount_){
+        printf("uid:%zu recpackagecount_ :%zu  sendpackagecount_ :%zu locount=%zu\n",uid_,recpackagecount_,sendpackagecount_,locount);
+    }
+
+    locount=recpackagecount_;
+    
 }
 
 void epollclienthandle::DelEvent(int tfd)
@@ -302,7 +319,7 @@ void epollclienthandle::InintialMyInfo(transfOnPer *p)
         myfriends_[cc->uid]=*cc ;
     }
 
-    printf("name:%s signature:%s friends:%d:\n",myinfo_.name,myinfo_.signature,myfriends_.size());
+    //printf("name:%s signature:%s friends:%lu\n",myinfo_.name,myinfo_.signature,myfriends_.size());
 }
 
 void epollclienthandle::AddNewFriends(transfOnPer *p)
@@ -381,9 +398,6 @@ int epollclienthandle::FormMsgAddToBuffer(uint32_t msgid,const char*buf,int len,
     }
 
     genCrcPayload(*out);
-
-    //std::memcpy(out,&p,STRUCTONPERLEN);
-    //printTransfOnPer(&p,"FormMsgAddToBuffer");
 
     return UTILNET_SUCCESS;
 }

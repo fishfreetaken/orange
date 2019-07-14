@@ -5,7 +5,7 @@
 #include <map>
 #include <vector>
 
-#define FRIENDFILEPATH "./data/userinfo"
+#define FRIENDFILEPATH "./data/userinfo2"
 
 class filehandle {
 public:
@@ -16,6 +16,8 @@ public:
 
     int GetResult(std::vector<transfPartner> &p,size_t &uid);
     int GetResult(transfPartner &p,size_t &uid);
+
+    void GenUserInfo(int num,const char *filename);
 
 private:
     void ParseFile();

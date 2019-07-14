@@ -6,7 +6,7 @@
 class channel;
 class  epollserverhandle:public epollhandlebase{
 public:
-    epollserverhandle(int timeout=1500):
+    epollserverhandle(int timeout=500):
     listen_fd_(-1),
     timeout_(timeout)
     {

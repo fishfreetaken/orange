@@ -10,19 +10,26 @@ int main()
         cryptmsg tmp;
         tmp.GenerateKeyFiles("./rsapub.pem","./rsapriv.pem");
 //client:
-        transfOnPer send;
-        std::memset(&send,0,STRUCTONPERLEN);
-        send.id=4;
-        send.uid=2156787956;
-        send.to=3;
-        sprintf(send.buf,"Hello world !1234567!Hello world cycle!123456789");
-        send.size=strlen(send.buf);
-        genCrcPayload(send);
+        transfOnPer send[3];
+        std::memset(&send,0,STRUCTONPERLEN*3);
+        send[0].id=4;
+        send[0].uid=2156787956;
+        send[0].to=3;
+        sprintf(send[0].buf,"Hello world !1234567!Hello world cycle!123456789");
+        send[0].size=strlen(send[0].buf);
+        genCrcPayload(send[0]);
+
+        send[1].id=895;
+        send[1].uid=234;
+        send[1].to=7;
+        sprintf(send[1].buf,"send buf 1...1235");
+        send[1].size=strlen(send[1].buf);
+        genCrcPayload(send[1]);
 
         unsigned char buf[RSA_KEY_LENGTH]={0};
         unsigned char aeskey[RSA_KEY_LENGTH]={0};
 
-        printTransfOnPer(&send,"client send");
+        printTransfOnPer(send,"client send");
 
         cryptmsg cli("./rsapub.pem");
 
@@ -43,20 +50,18 @@ int main()
 
 
         cli.AESGenEnCryptKey(aeskey,0);
-        cli.AESEncrypt((unsigned char*)&send,STRUCTONPERLEN,buf,RSA_KEY_LENGTH);
+        
+        cli.AESEncrypt((unsigned char*)&send[0],STRUCTONPERLEN,(unsigned char*)&send[0],STRUCTONPERLEN);
 
-        int cc=RSA_KEY_LENGTH-1;
-        while(*(buf+cc)=='\0')
-        {
-            cc--;
-        }
-        printf("cc==%d\n",cc);
+        cli.AESEncrypt((unsigned char*)&send[1],STRUCTONPERLEN,(unsigned char*)&send[1],STRUCTONPERLEN);
+
 
         cryptmsg s((char*)aeskey,RSA_KEY_LENGTH);
+
         transfOnPer recv;
         std::memset(&recv,0,STRUCTONPERLEN);
 
-        s.AESDecrypt(buf,RSA_KEY_LENGTH,(unsigned char*)&recv,STRUCTONPERLEN);
+        s.AESDecrypt((unsigned char*)&send[1],RSA_KEY_LENGTH,(unsigned char*)&recv,STRUCTONPERLEN);
 
         //hexprint(aeskey,strlen((char*)aeskey));
 

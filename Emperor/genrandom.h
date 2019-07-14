@@ -1,3 +1,5 @@
+#ifndef GENRANDOM_HEADER_
+#define GENRANDOM_HEADER_
 #include <random>
 
 /*
@@ -46,3 +48,5 @@ private :
     std::uniform_real_distribution<double> *realunif;
 
 };
+
+#endif

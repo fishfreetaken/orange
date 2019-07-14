@@ -94,6 +94,7 @@ int cryptmsg::AcquireRsaPubKey()
     }
 
     EVP_PKEY_assign_RSA(evprsakey_, rsa); 
+    BIO_free(bio_pub);
     return 0;
 erro:
     BIO_free(bio_pub); 
@@ -127,7 +128,7 @@ int cryptmsg::AcquireRsaSecKey()
     }
 
     EVP_PKEY_assign_RSA(evprsakey_, rsa);
-    //BIO_free(bio_priv); 
+    BIO_free(bio_priv); 
     return 0;
 
 error:
@@ -145,9 +146,9 @@ int cryptmsg::AESGenEnCryptKey(unsigned char *out,int ctl)
     if(ctl==0)
     {
         int ret=RAND_bytes(out, aeskeylen_);
-        //GENERRORPRINT("rand generate aes failed",ret,ctl);
         if(ret<=0)
         {
+            GENERRORPRINT("rand generate aes failed",ret,ctl);
             return -1;
         }
         aeskey_.assign((char*)out,aeskeylen_);
@@ -207,6 +208,7 @@ int cryptmsg::AESDecrypt(const unsigned char* encryptData,size_t encryptData_len
     {
         AES_cbc_encrypt(encryptData+i*AES_BLOCK_SIZE,decryptData+i*AES_BLOCK_SIZE,minus,&aes_ksd3,iv_,0);
     }
+
 
     return 0;
 }

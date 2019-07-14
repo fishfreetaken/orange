@@ -65,12 +65,13 @@ int user::SendTo()
 
 int user::SendMyself(const transfOnPer *info)
 {
-    
+
     if(info==NULL)
     {
         LOG::record(UTILLOGLEVELERROR,"%s para is NULL",__FUNCTION__);
         return USERPOINTNULL;
     }
+
     if(info->to!=uid_)
     {
         LOG::record(UTILLOGLEVELERROR,"%s uid mismatch %zu",__FUNCTION__,info->to);
@@ -138,7 +139,7 @@ while(1)
     //printf("ParsePacket while 1 ret=%d\n",ret);
     if((ret<STRUCTONPERLEN)||(ret<0))
     {
-        if ((errno == EINTR)||(errno == EAGAIN)||(ret==0))
+        if ((errno == EINTR)||(errno == EAGAIN))
         {
             //LOG::record(UTILNET_ERROR,"%s LINE:%d readfail:%s \n",__FUNCTION__,__LINE__,strerror(errno));
             return 0;
@@ -213,7 +214,6 @@ int user::GenericSend(const transfOnPer*info )
     if(ret==STRUCTONPERLEN)
     {
         sendpackagecount_++;
-        //printf("GenericSend writeGenericSend ret=%d  STRUCTONFRILEN=%d\n",ret,STRUCTONPERLEN);
     }else{
         GENERRORPRINT("send failed",ret,uid_);
     }
@@ -256,7 +256,6 @@ int user::GenericSend(const uint32_t id,const size_t &dest,const char*buf,size_t
     if(ret==STRUCTONPERLEN)
     {
         sendpackagecount_++;
-        //printf("GenericSend writeGenericSend ret=%d  STRUCTONFRILEN=%d\n",ret,STRUCTONPERLEN);
     }else{
         GENERRORPRINT("send failed",ret,uid_);
     }
@@ -279,7 +278,7 @@ void user::CurrentStat()
 
 void user::HeartBeat()
 {
-    printf("recvpacket_ client HeartBeat num: %zu\n",*recvpacket_.buf);
+    //printf("uid:%zu recvpacket_ client HeartBeat num: %zu\n",recvpacket_.uid,*recvpacket_.buf);
     GenericSend(MSGHEART,uid_,recvpacket_.buf,sizeof(size_t),0);
 }
 
@@ -319,7 +318,7 @@ int user::InitialMyInfo(transfOnPer &m,transfPartner &s,const channel *p)
         return USERNOTINITIALZE;
     }
 
-    printf("InitialMyInfo Debug fd=%d uid=%zu friend:%d\n",fd_,uid_,fri.size());
+    printf("InitialMyInfo Debug fd=%d uid=%zu friend:%lu\n",fd_,uid_,fri.size());
 
     GenericSend(MSGSERVERINFO,uid_,(char*)&s,STRUCTONFRILEN,0); /*返回数据给客户端，握手完成，如果客户端收不到再进行请求*/
     for(size_t i=0;i<fri.size();i++)
@@ -358,6 +357,7 @@ const std::shared_ptr<filehandle> channel::GetFileHD() const
 
 void channel::ServerStatPrint()
 {
+    #if 0
     printf("------current state--------\n");
     for(auto i:idmapuser_)
     {
@@ -368,6 +368,12 @@ void channel::ServerStatPrint()
             i.second->CurrentStat();
         }
     }
+    #endif
+    //printf("------current state--------\n");
+    static size_t lcount=0;
+    printf("current %zu online num:%d\n",lcount,idmapuser_.size());
+    lcount++;
+    
 }
 
 int channel::CheckUidIsInDb(transfOnPer &m,transfPartner &s)
@@ -470,7 +476,7 @@ int channel::UserReadProtocl(int tfd)
             /*协议解析失败，无效链接，关闭端口 */
         }
     }
-    ServerStatPrint();
+    //ServerStatPrint();
 
     return USERSUCCESS;
 }
@@ -488,8 +494,10 @@ void channel::UserRemove(int &tfd)
         GENERRORPRINT("remove not valid",tfd,it->second->GetUid());
         return ;
     }
+    static size_t count=0;
+    count++;
 
-    LOG::record(UTILLOGLEVELRECORD,"func:%s LINE:%d fd=%d uid=%zu",__FUNCTION__,__LINE__,tfd,it->second->GetUid());
+    LOG::record(UTILLOGLEVELRECORD,"func:%s localcount=%zu fd=%d uid=%zu",__FUNCTION__,count,tfd,it->second->GetUid());
 
     idmapuser_.erase(its);
     fdmapuser_.erase(it);

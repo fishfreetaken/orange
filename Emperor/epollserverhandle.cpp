@@ -34,7 +34,7 @@ int epollserverhandle::ServerStart(const char* listenip,const int port)
         throw strerror(errno);
     }
     timeeventout_=5000; /*server端3s轮训，client端1.5秒轮训 */
-    //tme_->TimeEventUpdate(timeeventout_,listen_fd_);
+    tme_->TimeEventUpdate(timeeventout_,listen_fd_);
 
     while(1)
     {
@@ -43,7 +43,9 @@ int epollserverhandle::ServerStart(const char* listenip,const int port)
         int ret = tme_->TimeEventProc(t);
         for(auto i:t)
         {
-            LOG::record(UTILLOGLEVELERROR, "TimeEventProc timeout %d",i);
+            //LOG::record(UTILLOGLEVELERROR, "TimeEventProc timeout %d",i);
+            chm_->ServerStatPrint();
+            tme_->TimeEventUpdate(timeeventout_,listen_fd_);
             //DelEvent(i);
         }
     }
@@ -88,7 +90,7 @@ while(1)
     if(evp_->EpollEventAdd(ee)==0)
     {
         /*添加定时事件，超时后将自动关闭该 端口*/
-        tme_->TimeEventUpdate(timeeventout_,tfd);//注册时间事件，如果超时没有连接的话需要清楚断开该连接
+        //tme_->TimeEventUpdate(timeeventout_,tfd);//注册时间事件，如果超时没有连接的话需要清楚断开该连接
     }
 }
 }
@@ -102,9 +104,9 @@ void epollserverhandle::ReadEvent(int tfd)
     if(ret!=0)  //进行协议解析处理，考虑使用线程池进行处理，快速的进行切换,对于某些错误放在一个队列中进行集中处理
     { //如果协议被有效的解析后，可以设置心跳时间
         DelEvent(ret);//如果解析处理后出错，直接断开删除该连接
-       //tme_->TimeEventUpdate(timeout_,tfd);//更新注册时间，否则将进行断开，同时用于心跳检测！
     }else{
-        tme_->TimeEventUpdate(timeeventout_,tfd);
+        //更新注册时间，否则将进行断开，同时用于心跳检测！
+        //tme_->TimeEventUpdate(timeeventout_,tfd);
     }
 }
 
@@ -112,7 +114,6 @@ void epollserverhandle::DelEvent(int tfd)
 {
     evp_->EpollDelEvent(tfd);
     chm_->UserRemove(tfd); //从通知channel从用户队列中删除；
-    LOG::record(UTILLOGLEVELRECORD,"Del connection %d",tfd);
     ::close(tfd);
 }
 

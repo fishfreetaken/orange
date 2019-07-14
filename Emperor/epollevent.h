@@ -15,8 +15,8 @@ public:
     virtual void DelEvent(int tfd)=0;
 
     virtual int WaitTimeOut()
-    {
-        return 1000;
+    {/*0应该是立即返回 */
+        return 0;
     }
 
 };

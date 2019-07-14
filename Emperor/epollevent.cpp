@@ -79,7 +79,7 @@ int epollevent::EpollEventAdd(struct epoll_event &ee)
     ee.events |=  EPOLLIN | EPOLLET |EPOLLRDHUP;
     ee.data.fd=tfd;
     */
-    printf("epoll create %d\n",ee.data.fd);
+    //printf("epoll create %d\n",ee.data.fd);
     if(epoll_ctl(epollfd_,EPOLL_CTL_ADD,ee.data.fd,&ee)==-1)
     {
         LOG::record(UTILLOGLEVELERROR,"epoll create %d:%s\n",errno,strerror(errno));
@@ -109,6 +109,9 @@ int epollevent::EpollEventWaite()
         if((ee_[i].data.fd==listen_fd_) && (ee_[i].events & EPOLLIN )) //添加事件
         {
             objhandle_->AcceptEvent(listen_fd_);
+        }else if(ee_[i].events & EPOLLRDHUP )
+        {
+            objhandle_->DelEvent(ee_[i].data.fd); //客户端主动断开连接
         }else if(ee_[i].events & EPOLLIN )
         {
             objhandle_->ReadEvent(ee_[i].data.fd);
@@ -116,10 +119,7 @@ int epollevent::EpollEventWaite()
         {
             objhandle_->WriteEvent(ee_[i].data.fd);
         }
-        else if(ee_[i].events & EPOLLRDHUP )
-        {
-            objhandle_->DelEvent(ee_[i].data.fd); //客户端主动断开连接
-        }else{
+        else{
             LOG::record(UTILLOGLEVELERROR,"epoll_wait fd:%d not known events %u\n",ee_[i].data.fd,ee_[i].events);
         }
     }
@@ -128,7 +128,6 @@ int epollevent::EpollEventWaite()
 
 int epollevent::EpollDelEvent(int fd)
 {
-    LOG::record(UTILLOGLEVELRECORD,"%d disconnect\n",fd);
     struct epoll_event ee ; /* avoid valgrind warning */
     std::memset(&ee,0,sizeof(struct epoll_event));
     ee.events = 0;

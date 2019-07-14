@@ -9,29 +9,41 @@
 int main(int argc, char*argv[])  
 {
     int f=-1;
-    printf("argc:%d\n",argc);
-    if(argc>1)
-    {
-        f=*(argv[1])-'0';
-    }
     int ret=0;
-    if(f>0)
+    printf("argc:%d\n",argc);
+    if(argc==2)
     {
-        std::shared_ptr<epollclienthandle> m = std::make_shared<epollclienthandle>(f);
-        
-        while((ret<5)&&(ret>=0))
+        f=atoi(argv[1]);
+        if(f>0)
         {
-            ret=m->StartConnect(SERVERLISTENIP,SERVERLISTENPORT);
-            GENERRORPRINT("StartConnect failed",ret,0);
-            sleep(3);
+            std::shared_ptr<epollclienthandle> m = std::make_shared<epollclienthandle>(f);
+            
+            while((ret<5)&&(ret>=0))
+            {
+                ret=m->StartConnect(SERVERLISTENIP,SERVERLISTENPORT);
+                GENERRORPRINT("StartConnect failed",ret,0);
+                sleep(3);
+            }
+            return 1;
         }
-        return 1;
     }
+    
+    int num=0;
+
+    int fd=0;
+    int i=0;
+    if(argc==3)
+    {
+        num=atoi(argv[2]);
+    }else{
+        i=1;
+    }
+    
+    printf("fork num is %d\n",num);
 
     #if 1
-        int fd=0;
-        int i=0;
-        for(i=1;i<1000;i++)
+        
+        for(i=1;i<num;i++)
         {
             fd=fork();
             if(fd==0)
