@@ -3,11 +3,11 @@
 
 gRootPath="/mnt/team1data/cd/6700_0312/" 
 
-export gEc="613005070598"
-export gHEc="61300"
-export gLEc="5070598"
+export gEc=""
+export gHEc=""
+export gLEc=""
 
-gPatchNo="2"
+gPatchNo=""
 
 #相对路径code/xtn/ps/resmgr  sup/code/
 gSourcePath=""
@@ -56,6 +56,8 @@ gtargetCpuArray=()
 gFuncNameList=()
 gFuncRepledNameList=()
 
+#使用一个变量进行补丁文件名统一管理其阿里
+gpatchfilename=""
 
 #异常抛出
 function Exception()
@@ -129,20 +131,15 @@ function initVar()
     #val=${val/,/}
     #echo $key $val
 
-    if [ $key == "EC" ];then
-        gEc=$val
-        return
-    fi
+#    if [ $key == "EC" ];then
+#        gEc=$val
+#        return
+#    fi
 
-    if [ $key == "NO" ];then
-        gPatchNo=$val
-        return
-    fi
-
-    if [ $key == "LE" ];then
-        gProcessLE=$val
-        return
-    fi
+#   if [ $key == "NO" ];then
+#        gPatchNo=$val
+#        return
+#    fi
 
     if [ $key == "PROCESSOR" ];then
         gProcessName=$val
@@ -272,7 +269,6 @@ function parseJson()
     controlfunc="0";
     while read line 
     do
-        
         if [ ${#line} -lt 2 ];then
             continue
         fi
@@ -315,39 +311,39 @@ function parseJson()
 function parseSDL()
 {
     boardline=""
+    tb=""
     while read line
     do
-        t=$(echo $line | grep "board=[0-9]* & cpu.arch=*")
-        if [ -n "$t" ];then
-            t=${t//&/}
-            #echo $t
-            #echo "pre"=${#t}
-            t=${t/:*/}
-            #echo "after"=${#t}
-            boardline=$t
+        tb=$(echo $line | grep "board=[0-9]* & cpu.arch=[0-9]*")
+        if [ -n "$tb" ];then
+            boardline=""
+            if [ "$1" != "$2" ];then
+                tb=$(echo $line | grep "board=[0-9]* & cpu.arch=[0-9]* & bom=$2 .*")
+            fi
+            if [ -n "$tb" ];then
+                tb=${tb//&/}
+                #echo $t
+                #echo "pre"=${#t}
+                tb=${tb/:*/}
+                #echo "after"=${#t}
+                boardline=$tb
+            fi
+        fi
+
+        if [ -z "$boardline" ];then
+            #echo "not find dest board;"
+            continue;
         fi
 
         t=$(echo $line | grep "app, file=bin/.*/$gProcessName;")
         if [ -n "$t" ];then
-            #echo "$t"
-            #echo "pre"=${#t}
             t=${t/;*/}
             t=${t/app,/}
             #echo "after"=${#t}
             echo $boardline 
             echo $t
-           # boardline=${boardline//limit=*/}
-           # tt=${#sdlBoardNameArray[*]}
-           # if [ $tt -eq 0 ];then
-           #     sdlBoardNameArray[${#sdlBoardNameArray[*]}]="$boardline""$t"
-           #     continue
-           # fi
-           # tt=$((tt-1))
-           # if [ ${sdlBoardNameArray[$tt]} ==  "$boardline""$t" ];then
-           #     continue
-           # fi
+
 			if [ ${#gtargetCpuArray[@]} -eq 0 ];then
-		   
 				sdlBoardNameArray[${#sdlBoardNameArray[*]}]="$boardline""$t"
 			else
 				for i in ${gtargetCpuArray[@]}
@@ -359,9 +355,11 @@ function parseSDL()
 					fi
 				done
 			fi
+            boardline=""
+            tb=""
             #sdlBoardNameArray[${#sdlBoardNameArray[*]}]="$boardline""$t"
         fi
-    done < $1
+    done < $1.sdl
 }
 
 function parseSdlArray()
@@ -425,10 +423,14 @@ function findCommonDir()
 
     for i in ${gboardNameArray[@]}
     do
-        if [ ! -f "$i.sdl" ];then
-            Exception "$i.sdl file do not exist, please check json!"
+        bom=${i#*/}
+        boardname=${i%/*}
+        echo $bom
+        echo $boardname
+        if [ ! -f "$boardname.sdl" ];then
+            Exception "$boardname.sdl file do not exist, please check json!"
         fi
-        parseSDL $i.sdl
+        parseSDL $boardname $bom
     done
     parseSdlArray
 
@@ -447,7 +449,7 @@ function init()
     findCommonDir
 
     #进入补丁路径
-    cd ./patch$gEc/
+    cd ./$gpatchfilename/
     gWorkPath=$(pwd)
     if [ ! -d ./target ];then
         mkdir ./target
@@ -558,7 +560,6 @@ function testAndDel()
 #编译
 function genCoFile()
 {
-    #cp ../source/*  $gSourcePath
     lowcpu=$(echo $gCPUType | tr "A-Z" "a-z")
 
     cd ../../../make
@@ -577,21 +578,36 @@ function genCoFile()
         rm ./target/$gCPUType/*
     fi
 
-    targetDirPath=$gRootPath"target/tmp/no_nsr_release/"
-    libOrBin=${gMakeCmd:0:3}
-    if [ $libOrBin == "lib" ];then
+    targetDirPath=""
+    suporno=${gSourcePath%%/*}
+    
+    if [ $suporno == "sup" ];then
+        targetDirPath=$gRootPath"sup/target/tmp/no_nsr_release/"
         targetDirPath=$targetDirPath"lib/"${gMakeCmd:3}"_$lowcpu""_"$gDynamicTag"/"
-    else
-        targetDirPath=$targetDirPath"bin/"$lowcpu"/"$gProcessName"/"
-    fi
-    echo targetDirPath: $targetDirPath
 
-    if [ $gDynamicTag == "dynamic" ];then
-        cp $gRootPath"target/no_nsr_release/lib/$lowcpu/$gLinkSOFile" ./target/$gCPUType/
-        if [ $? -ne 0 ];then
-            Exception "gDynamicTag cp $gRootPath""target/no_nsr_release/lib/$lowcpu/$gLinkSOFile failed"
+        if [ $gDynamicTag == "dynamic" ];then
+            cp $gRootPath"sup/target/no_nsr_release/lib/$lowcpu/$gLinkSOFile" ./target/$gCPUType/
+            if [ $? -ne 0 ];then
+                Exception "gDynamicTag cp $gRootPath""target/no_nsr_release/lib/$lowcpu/$gLinkSOFile failed"
+            fi
+        fi
+    else
+        targetDirPath=$gRootPath"target/tmp/no_nsr_release/"
+        libOrBin=${gMakeCmd:0:3}
+        if [ $libOrBin == "lib" ];then
+            targetDirPath=$targetDirPath"lib/"${gMakeCmd:3}"_$lowcpu""_"$gDynamicTag"/"
+        else
+            targetDirPath=$targetDirPath"bin/"$lowcpu"/"$gProcessName"/"
+        fi
+
+        if [ $gDynamicTag == "dynamic" ];then
+            cp $gRootPath"target/no_nsr_release/lib/$lowcpu/$gLinkSOFile" ./target/$gCPUType/
+            if [ $? -ne 0 ];then
+                Exception "gDynamicTag cp $gRootPath""target/no_nsr_release/lib/$lowcpu/$gLinkSOFile failed"
+            fi
         fi
     fi
+    echo targetDirPath: $targetDirPath
 
     tmpSrclist=(`ls ./source/`)
     for i in ${tmpSrclist[@]}
@@ -644,6 +660,7 @@ function genSOFile()
 
 function acquirFuncSymbal()
 {
+    gFuncNameList=()
     for i in ${!repldFuncNameArray[@]}
     do
         echo repldFuncNameArray $i ${repldFuncNameArray[i]}
@@ -793,9 +810,9 @@ function genPchFile()
     genPchJsonFile
     cd ../
     #删除重新生成
-    ./patchtool_v3 -c ./patch$gEc/config/$gUnifiedNameJson
+    ./patchtool_v3 -c ./$gpatchfilename/config/$gUnifiedNameJson
     if [ $? -ne 0 ];then
-        Exception "./patchtool_v3 -c ./patch$gEc/config/$gUnifiedNameJson"
+        Exception "./patchtool_v3 -c ./$gpatchfilename/config/$gUnifiedNameJson"
     fi
     cd -
 }
@@ -844,8 +861,8 @@ function genConfigMak()
     echo "IR_NSR=nsr" >> $tmpfile
     echo "BUILD_DEFINE=-DARCH_TYPE=$gCPUType -DLIBPCAP_NUM=1 -DLIBPCAP_VERNUM=1.0.0 -DLIB_NSR=lib_nsr -DDIR_NSR=\$(DIR_NSR)" >> $tmpfile
     echo "PROJECT=\"$gBigVersion REL\"" >> $tmpfile
-    echo "_PKG_CONFIG=hotpatch/patch$gEc/config/" >> $tmpfile
-    #echo "EXTERN_FILEINFO=$gRootPath""product/"$gVersion"/pkg/hotpatch/patch$gEc/config/fileinfo" >> $tmpfile
+    echo "_PKG_CONFIG=hotpatch/$gpatchfilename/config/" >> $tmpfile
+    #echo "EXTERN_FILEINFO=$gRootPath""product/"$gVersion"/pkg/hotpatch/$gpatchfilename/config/fileinfo" >> $tmpfile
 	echo "EXTERN_FILEINFO="$tmpcfpath"/fileinfo" >> $tmpfile
     echo "VM_PKGS=Patch" >> $tmpfile
 }
@@ -858,11 +875,11 @@ function genFileInfo()
     fi
 
     echo "FILE,SOURCE,COMPRESS,MAKE" >> $tmpfile
-    echo "sdl/patch.sdl,\${PROJECT}/pkg/hotpatch/patch$gEc/config/patch.sdl,," >> $tmpfile
+    echo "sdl/patch.sdl,\${PROJECT}/pkg/hotpatch/$gpatchfilename/config/patch.sdl,," >> $tmpfile
     pchlist=($(ls *.pch))
     for i in ${pchlist[@]}
     do
-        echo "patch/$i,\${PROJECT}/pkg/hotpatch/patch$gEc/config/$i,," >> $tmpfile
+        echo "patch/$i,\${PROJECT}/pkg/hotpatch/$gpatchfilename/config/$i,," >> $tmpfile
     done
 }
 
@@ -916,13 +933,23 @@ function genPatchSdl()
         if [ ${#t[@]} -lt 4 ];then
             Exception "genPatchSdl $i ${#t[@]} invalid"
         fi
-        tmps="${t[0]#*=}${t[1]#*=}"
+
+        if [ "${t[2]%=*}" == "bom" ];then
+            tmps="${t[0]#*=}${t[1]#*=}${t[2]#*=}"
+        else
+            tmps="${t[0]#*=}${t[1]#*=}"
+        fi
 
         if [ ! -z ${dicttmp[$tmps]} ];then
             continue
         fi
         dicttmp["$tmps"]=1
-        echo "  ${t[0]} & ${t[1]} & ${t[2]}:"  >>  $tmpfile
+
+        if [ "${t[2]%=*}" == "bom" ];then
+            echo "  ${t[0]} & ${t[1]} & ${t[2]} & ${t[3]}:"  >>  $tmpfile
+        else
+            echo "  ${t[0]} & ${t[1]} & ${t[2]}:"  >>  $tmpfile
+        fi
 
         cpu=${sdlBoardNameArray[$i]}
         cpu=${cpu#*/}
@@ -965,7 +992,7 @@ function movrename()
         mkdir $dstpth
     fi
 
-    srcpth=$pth/patch$gEc/config/RELEASE/hotpatch/patch$gEc/config/
+    srcpth=$pth/$gpatchfilename/config/RELEASE/hotpatch/$gpatchfilename/config/
     if [ ! -d $srcpth ];then
         Exception "movrename srcpth: $srcpth"
     fi
@@ -994,16 +1021,16 @@ function buildpkg()
     cd -
     cd ../../
 
-make config _PKG_CONFIG=hotpatch/patch$gEc/config/ REL=1 
+make config _PKG_CONFIG=hotpatch/$gpatchfilename/config/ REL=1 
 
 if [ $? -ne 0 ];then
-    Exception "make config _PKG_CONFIG=hotpatch/patch$gEc/config/ REL=1  failed"
+    Exception "make config _PKG_CONFIG=hotpatch/$gpatchfilename/config/ REL=1  failed"
 fi
 
-make Patch _CONFIG=hotpatch/patch$gEc/config REL=1
+make Patch _CONFIG=hotpatch/$gpatchfilename/config REL=1
 
 if [ $? -ne 0 ];then
-    Exception "make Patch _CONFIG=hotpatch/patch$gEc/config REL=1 failed"
+    Exception "make Patch _CONFIG=hotpatch/$gpatchfilename/config REL=1 failed"
 fi
 
 movrename
@@ -1013,7 +1040,9 @@ movrename
 function helpt()
 {
     echo "Useage:"
-    echo "./pchmaker2.sh ./patch613001234567/H3.json"
+    #echo "./pchmaker2.sh ./patch613001234567/H3.json"
+    echo  "./pchmaker2.sh 5"
+    echo  "5 is the patch NO."
 }
 
 function begin(){
@@ -1023,12 +1052,33 @@ function begin(){
         exit
     fi
 
-    if [ ! -f $1 ];then
-        Exception "Cannot find $1 file!"
+    gpatchfilename=$(ls | grep "patch61.*_H$1")
+
+    if [ ! -d $gpatchfilename ];then
+        Exception "Cannot find $gpatchfilename dir!"
+    fi
+    
+    #echo "patch613005106648_H5" | sed -n "s/patch//p" | sed -n "s/_H[0-9]*//p"
+    gEc=$(echo $gpatchfilename | sed -n "s/patch//p" | sed -n "s/_H[0-9]*//p")
+    gPatchNo=$(echo $gpatchfilename | sed -n "s/patch[0-9]*_H"//p)
+    echo $gEc  $gPatchNo
+
+    if [ -z $gEc ];then
+        Exception "not find EC";
+    fi
+    if [ -z $gPatchNo ];then
+        Exception "not find patchNO";
     fi
 
-    mainwork $1
+    para="./$gpatchfilename/H$gPatchNo.json"
+    echo $para
+    if [ ! -f $para ];then
+        Exception "Cannot find $para file!"
+    fi
+
+    mainwork $para
     buildpkg
+
 }
 
 begin $1
