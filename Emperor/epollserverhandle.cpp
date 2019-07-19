@@ -33,21 +33,21 @@ int epollserverhandle::ServerStart(const char* listenip,const int port)
         LOG::record(UTILLOGLEVELERROR, "ServerStart failed %s : %s",__FUNCTION__, strerror(errno));
         throw strerror(errno);
     }
-    timeeventout_=5000; /*server端3s轮训，client端1.5秒轮训 */
-    tme_->TimeEventUpdate(timeeventout_,listen_fd_);
+    timeeventout_=1000; /*server端3s轮训，client端1.5秒轮训 */
+    //tme_->TimeEventUpdateLRU(timeeventout_,listen_fd_);
+    int ret=0;
 
     while(1)
     {
-        evp_->EpollEventWaite();//程序主入口
-        std::vector<int> t;
-        int ret = tme_->TimeEventProc(t);
-        for(auto i:t)
-        {
-            //LOG::record(UTILLOGLEVELERROR, "TimeEventProc timeout %d",i);
-            chm_->ServerStatPrint();
-            tme_->TimeEventUpdate(timeeventout_,listen_fd_);
-            //DelEvent(i);
+        ret = tme_->TimeEventProc();
+        if(ret>=0)
+        {/*一次只删除一个连接 */
+            DelEvent(ret);
         }
+
+        ret=evp_->EpollEventWaite();//程序主入口
+
+        chm_->ServerStatPrint(tme_->CurrentFdEventNum(),ret);
     }
     return 0;
 }
@@ -90,7 +90,7 @@ while(1)
     if(evp_->EpollEventAdd(ee)==0)
     {
         /*添加定时事件，超时后将自动关闭该 端口*/
-        //tme_->TimeEventUpdate(timeeventout_,tfd);//注册时间事件，如果超时没有连接的话需要清楚断开该连接
+        tme_->TimeEventUpdate(timeeventout_,tfd);//注册时间事件，如果超时没有连接的话需要清楚断开该连接
     }
 }
 }
@@ -106,13 +106,14 @@ void epollserverhandle::ReadEvent(int tfd)
         DelEvent(ret);//如果解析处理后出错，直接断开删除该连接
     }else{
         //更新注册时间，否则将进行断开，同时用于心跳检测！
-        //tme_->TimeEventUpdate(timeeventout_,tfd);
+        tme_->TimeEventUpdateLRU(timeeventout_,tfd);
     }
 }
 
 void epollserverhandle::DelEvent(int tfd)
 {
     evp_->EpollDelEvent(tfd);
+    tme_->TimeEventRemove(tfd);
     chm_->UserRemove(tfd); //从通知channel从用户队列中删除；
     ::close(tfd);
 }
