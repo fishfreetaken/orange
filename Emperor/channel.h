@@ -93,7 +93,7 @@ public:
 
     const std::shared_ptr<filehandle> GetFileHD() const;
 
-    void ServerStatPrint();
+    void ServerStatPrint(int fdnum,int events);
 
 private:
 
