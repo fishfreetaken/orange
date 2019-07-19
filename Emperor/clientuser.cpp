@@ -12,7 +12,6 @@ send_pos_begin_(-1),
 send_pos_end_(-1),
 recpackagecount_(0),
 sendpackagecount_(0),
-sendfailedcount_(0),
 heart_count_(0)
 {
     try{
@@ -41,7 +40,7 @@ epollclienthandle::~epollclienthandle()
 
 int epollclienthandle::WaitTimeOut()
 {
-    return 300;
+    return 1000;
 }
 
 void SingalCallBack(int signale_number)
@@ -56,20 +55,16 @@ int epollclienthandle::StartConnect(const char* listenip,int port)
         LOG::record(UTILLOGLEVELERROR, "not valid uid");
         return UTILNET_ERROR; 
     }
-    errno=0;
 
     fd_=tcpGenericConnect(NULL,0,listenip,port);
     if(fd_<0)
     {
-        sendfailedcount_++;
         LOG::record(UTILLOGLEVELERROR, "tcpGenericConnect %d: %s",errno,strerror(errno));
-        return sendfailedcount_;
+        return UTILNET_ERROR;
     }
-    sendfailedcount_=0;
 
     setNonBlock(fd_);
     //LOG::record(UTILLOGLEVELWORNNING, "tcpGenericConnect server fd: %d uid:%zu", fd_,uid_);
-
     try
     {
         evp_=std::make_shared<epollevent>(this,fd_);
@@ -88,6 +83,8 @@ int epollclienthandle::StartConnect(const char* listenip,int port)
     crypt_->AESGenEnCryptKey((unsigned char*)key->key,0);
 
     snprintf(key->secret,LOADPERSONCRTPYLEN,"dadonggeSecret");/*这个地方后边要用md5 */
+    crypt_->Sha256Hash((unsigned char*)key->secret,strlen(key->secret),(unsigned char*)key->secret,LOADPERSONCRTPYLEN);
+
     st.id=MSGSECRET;
     st.uid=uid_;
 
@@ -107,7 +104,7 @@ int epollclienthandle::StartConnect(const char* listenip,int port)
         return UTILNET_ERROR;
     }
 
-    tme_->TimeEventUpdate(1500,fd_);
+    tme_->TimeEventUpdate(1000,fd_);
 
     /*标准输入输出 */
     setNonBlock(0);
@@ -149,9 +146,10 @@ int epollclienthandle::StartConnect(const char* listenip,int port)
         //先将个人信息写入发送至服务端获取个人信息；
         if(UserSendMsgPoll()!=UTILNET_SUCCESS)
         {/*发送数据失败，断开连接 */
-            return sendfailedcount_;
+            return UTILNET_ERROR;
         }
     }
+    return UTILNET_SUCCESS;
 }
 
 /*从server端收到的数据 */
@@ -185,7 +183,7 @@ while(1)/*一次并不能读完 */
             GENERRORPRINT("AESDecrypt failed",ret,0);
             return ;
         }
-    #else 
+    #else
         std::memcpy(&recvpacketbuf_,serverbuffer_,STRUCTONPERLEN);
     #endif
 
@@ -235,10 +233,8 @@ void epollclienthandle::ShowPacketInfo()
     if((recpackagecount_!=(sendpackagecount_+2)))
     {
         printf("uid:%zu recpackagecount_ :%zu  sendpackagecount_ :%zu locount=%zu\n",uid_,recpackagecount_,sendpackagecount_,locount);
-
-    }else if(locount==recpackagecount_){
-        printf("uid:%zu recpackagecount_ :%zu  sendpackagecount_ :%zu locount=%zu\n",uid_,recpackagecount_,sendpackagecount_,locount);
     }
+    printf("uid:%zu recpackagecount_ :%zu  sendpackagecount_ :%zu locount=%zu\n",uid_,recpackagecount_,sendpackagecount_,locount);
 
     locount=recpackagecount_;
     
@@ -285,6 +281,7 @@ int epollclienthandle::UserSendMsgPoll()
     if(errno==EPIPE)
     {
         GENERRORPRINT("errno EPIPE",errno,0);
+        errno=0;
         DelEvent(fd_);
         return errno;
     }
@@ -300,7 +297,6 @@ int epollclienthandle::UserSendMsgPoll()
         }else{
             sendfailedcount_++;
         }
-        
     }
     #endif
     return UTILNET_SUCCESS;
