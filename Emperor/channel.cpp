@@ -23,7 +23,6 @@ sendpackagecount_(0)
         throw std::string("user new failed fd:") + std::to_string(fd);
     }
 
-    
     vecrecvpackcc_.resize(VECTRESIZEPACTSIZE,0);
 }
 
@@ -133,7 +132,7 @@ int user::ParsePacket(int fd)
 {
     int ret=0;
 while(1)
-{//不知道为啥用这个会跑飞
+{
 
     ret=readGenericReceive(fd,(char *)&recvpacket_,STRUCTONPERLEN);
     //printf("ParsePacket while 1 ret=%d\n",ret);
@@ -355,7 +354,7 @@ const std::shared_ptr<filehandle> channel::GetFileHD() const
     return filehd_;
 }
 
-void channel::ServerStatPrint()
+void channel::ServerStatPrint(int timefds,int events)
 {
     #if 0
     printf("------current state--------\n");
@@ -371,7 +370,7 @@ void channel::ServerStatPrint()
     #endif
     //printf("------current state--------\n");
     static size_t lcount=0;
-    printf("current %zu online num:%d\n",lcount,idmapuser_.size());
+    printf("current %zu online num:%d tim:%d events:%d\n",lcount,idmapuser_.size(),timefds,events);
     lcount++;
     
 }
@@ -476,7 +475,6 @@ int channel::UserReadProtocl(int tfd)
             /*协议解析失败，无效链接，关闭端口 */
         }
     }
-    //ServerStatPrint();
 
     return USERSUCCESS;
 }
