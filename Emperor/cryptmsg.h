@@ -7,7 +7,7 @@
 #include <openssl/rand.h> 
 #include <openssl/evp.h>
 #include <openssl/err.h>
- #include <openssl/engine.h>
+#include <openssl/engine.h>
 
 #include <string>
 #define CRYPTTYPERSA 1
@@ -43,6 +43,10 @@ public:
     int RSABaseDecrypt(const unsigned char* encrypt_data,size_t encrypt_data_len,unsigned char *decrypt_data);
     int RSABaseEncrypt(const unsigned char* data,size_t datalen,unsigned char *encrypt_data);
 
+    /*固定输出32字节 */
+    int Sha256Hash(const unsigned char* data,size_t datalen,unsigned char *hash_data,size_t hash_datalen);
+    int Sha256HashUpdate(const unsigned char* data,size_t datalen,unsigned char *hash_data);
+
 private:
     int AcquireRsaPubKey();  /*从第三方获取一个公共秘钥 */
     int AcquireRsaSecKey();  /*预先在客户端内部加入一个公钥，使用文件配置私钥，从指定路径获取私钥*/
@@ -62,6 +66,7 @@ private:
     unsigned char iv_[MAX_BLOCK_SIZE];      //="jofjwoiiewi23";
     unsigned char passwd_[MAX_BLOCK_SIZE];  //="donggeshidalao";
 
+    EVP_MD_CTX *md_ctx_;
 };
 
 #endif
