@@ -4,8 +4,6 @@
 //#include "openssl.h"
 //std::cin.getline(buf,TMPBUFFERLEN);
 
-
-
 int main(int argc, char*argv[])  
 {
     int f=-1;
@@ -18,11 +16,15 @@ int main(int argc, char*argv[])
         {
             std::shared_ptr<epollclienthandle> m = std::make_shared<epollclienthandle>(f);
             
-            while((ret<5)&&(ret>=0))
+            while(ret<5)
             {
-                ret=m->StartConnect(SERVERLISTENIP,SERVERLISTENPORT);
+                if(m->StartConnect(SERVERLISTENIP,SERVERLISTENPORT)==0)
+                {
+                    break;
+                }
                 GENERRORPRINT("StartConnect failed",ret,0);
                 sleep(3);
+                ret++;
             }
             return 1;
         }
