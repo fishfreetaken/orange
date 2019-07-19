@@ -2,7 +2,10 @@
 
 #include<sys/time.h>
 #include <map>
+#include <unordered_map>
+#include <list>
 #include <vector>
+#include <utility>
 #define EPOLLMAXEVENTS 1024
 #define READBUFFLENMAX 512
 
@@ -54,11 +57,18 @@ public:
 
     int TimeEventUpdate(size_t milliseconds,int fd); //对于每个fd如果没有在map中的话，添加，如果在的话进行更新
 
+    int TimeEventUpdateLRU(size_t milliseconds,int fd);
+    int TimeEventProc();
+
+    int CurrentFdEventNum();
+    int TimeEventRemove(int tfd);
+
 private :
     int TimeExceedJudge(struct timeval &a,struct timeval &b);
     void TimeShow(struct timeval &tv);
 private :
     std::map<int,struct timeval> ump_;
-
+    std::unordered_map<int,std::list<std::pair<int,struct timeval>>::iterator > fdtopos_;
+    std::list<std::pair<int,struct timeval>>  lst_;
 };
 
