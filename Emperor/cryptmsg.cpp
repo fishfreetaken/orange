@@ -23,7 +23,8 @@ cryptmsg::cryptmsg(const char*s):
 //rsakeyfile_("./rsapub.pem"), //客户端读取public的key
 rsakeyfile_(s),
 evprsakey_(nullptr),
-aeskeylen_(256)
+aeskeylen_(256),
+md_ctx_(nullptr)
 {
 
     std::memset(iv_,0,MAX_BLOCK_SIZE);
@@ -40,7 +41,8 @@ aeskeylen_(256)
 cryptmsg::cryptmsg(const char* s,size_t len):  /*server 初始化一个aes秘钥 */
 rsakeyfile_("./rsapriv.pem"), /*private key */
 evprsakey_(nullptr), 
-aeskeylen_(256)
+aeskeylen_(256),
+md_ctx_(nullptr)
 {
     aeskey_.assign(s,aeskeylen_);
     //LOG::record(UTILLOGLEVELRECORD,"server cryptmsg create \n");
@@ -454,6 +456,95 @@ int cryptmsg::GenerateKeyFiles(const char* pub_key_file, const char* priv_key_fi
     RSA_free(rsa); 
     return 0; 
 }
+/*用于短码进行hash */
+int cryptmsg::Sha256Hash(const unsigned char* data,size_t datalen,unsigned char *hash_data,size_t hash_datalen)
+{
+    unsigned int val=0;
+    EVP_MD_CTX *ctx=nullptr;
+    if(hash_datalen<32)
+    {
+        GENERRORPRINT("not valid hash len",datalen,hash_datalen);
+        return UTILNET_ERROR;
+    }
+    ctx=EVP_MD_CTX_create();
+    
+    if(EVP_DigestInit_ex(ctx, EVP_sha256(), NULL)<=0)
+    {
+        goto error;
+    }
 
+    if(EVP_DigestUpdate(ctx,data,datalen)<0)
+    {
+        goto error;
+    }
+
+    if(EVP_DigestFinal_ex(ctx,hash_data,&val))
+    {
+        goto error;
+    }
+
+    EVP_MD_CTX_cleanup(ctx);
+    EVP_MD_CTX_destroy(ctx);
+
+    if(val!=32)
+    {
+        GENERRORPRINT("not valid hash len",datalen,hash_datalen);
+        goto error;
+    }
+
+    return 32;
+
+error:
+    EVP_MD_CTX_cleanup(ctx);
+    EVP_MD_CTX_destroy(ctx);
+    return UTILNET_ERROR;
+}
+
+/*update:1 update；update：0 getresult */
+int cryptmsg::Sha256HashUpdate(const unsigned char* data,size_t datalen,unsigned char *hash_data)
+{
+    unsigned int val=0;
+
+    if(md_ctx_==nullptr)
+    {
+        md_ctx_=EVP_MD_CTX_create();
+        if(EVP_DigestInit_ex(md_ctx_, EVP_sha256(), NULL)<=0)
+        {
+            goto error;
+        }
+    }
+
+    if(EVP_DigestUpdate(md_ctx_,data,datalen)<0)
+    {
+        goto error;
+    }
+
+    if(hash_data==nullptr)
+    {
+        return datalen;
+    }
+
+    if(EVP_DigestFinal_ex(md_ctx_,hash_data,&val))
+    {
+        goto error;
+    }
+
+    if(val!=32)
+    {
+        GENERRORPRINT("not valid hash len",datalen,val);
+        goto error;
+    }
+
+    EVP_MD_CTX_cleanup(md_ctx_);
+    EVP_MD_CTX_destroy(md_ctx_);
+
+    return val;
+
+error:
+    EVP_MD_CTX_cleanup(md_ctx_);
+    EVP_MD_CTX_destroy(md_ctx_);
+    GENERRORPRINT("error hash sha256",0,0);
+    return UTILNET_ERROR;
+}
 
 
