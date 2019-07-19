@@ -189,6 +189,80 @@ int timeevent::TimeEventProc(std::vector<int> &m)
     return ret;
 }
 
+int timeevent::TimeEventRemove(int tfd)
+{
+    auto it=fdtopos_.find(tfd);
+    if(it==fdtopos_.end())
+    {
+        return 0;
+    }
+    lst_.erase(it->second);
+    fdtopos_.erase(it);
+
+    return 1;
+
+}
+
+int timeevent::TimeEventUpdateLRU(size_t milliseconds,int fd)
+{
+    struct timeval tv;
+
+    gettimeofday(&tv, NULL);
+    //TimeShow(tv);
+
+    tv.tv_usec += milliseconds * 1000;
+    tv.tv_sec += tv.tv_usec/1000000;
+    tv.tv_usec = tv.tv_usec %1000000;
+
+    auto it=fdtopos_.find(fd);
+    if(it!=fdtopos_.end())
+    {
+        lst_.erase(it->second);
+    }
+
+    lst_.push_front(std::make_pair(fd,tv));
+    fdtopos_[fd]=lst_.begin();
+    return 0;
+}
+
+/*一次只返回一个fd，进行处理 */
+int timeevent::TimeEventProc()
+{
+    //std::map<int,list<pair<int,<struct timeval>>::iterator> fdtopos_;
+    //std::list<pair<int,<struct timeval>> lst_;
+    if(0==lst_.size())
+    {
+        if(fdtopos_.size()!=0)
+        {
+            GENERRORPRINT("not null!",fdtopos_.size(),lst_.size());
+        }
+        return -1;
+    }
+
+    struct timeval tv;
+
+    auto it=lst_.back();
+
+    gettimeofday(&tv, NULL);
+    if(TimeExceedJudge(tv,it.second))
+    {/*超时处理 */
+        int fd=it.first;
+        fdtopos_.erase(fd);
+        lst_.pop_back();
+        return fd;
+    }
+    return -1;
+}
+
+int timeevent::CurrentFdEventNum()
+{
+    if(fdtopos_.size()!=lst_.size())
+    {
+        GENERRORPRINT("mismatch!",fdtopos_.size(),lst_.size());
+    }
+    return fdtopos_.size();
+}
+
 int timeevent::TimeExceedJudge(struct timeval &a,struct timeval &b)
 {
     if(a.tv_sec > b.tv_sec)
