@@ -483,9 +483,13 @@ int cryptmsg::Sha256Hash(const unsigned char* data,size_t datalen,unsigned char 
         goto error;
     }
 
+#ifdef OPENSSLOLDVERSION
+//在新的openssl版本上不是用阿！
     EVP_MD_CTX_cleanup(ctx);
     EVP_MD_CTX_destroy(ctx);
-
+#else
+    EVP_MD_CTX_free(ctx);
+#endif
     if(val!=32)
     {
         GENERRORPRINT("not valid hash len",datalen,hash_datalen);
@@ -495,8 +499,14 @@ int cryptmsg::Sha256Hash(const unsigned char* data,size_t datalen,unsigned char 
     return 32;
 
 error:
+#ifdef OPENSSLOLDVERSION
+//在新的openssl版本上不是用阿！
     EVP_MD_CTX_cleanup(ctx);
     EVP_MD_CTX_destroy(ctx);
+#else
+    EVP_MD_CTX_free(ctx);
+#endif
+
     return UTILNET_ERROR;
 }
 
@@ -535,14 +545,26 @@ int cryptmsg::Sha256HashUpdate(const unsigned char* data,size_t datalen,unsigned
         goto error;
     }
 
+#ifdef OPENSSLOLDVERSION
+//在新的openssl版本上不是用阿！
     EVP_MD_CTX_cleanup(md_ctx_);
     EVP_MD_CTX_destroy(md_ctx_);
+#else
+    EVP_MD_CTX_free(md_ctx_);
+#endif
 
     return val;
 
 error:
-    EVP_MD_CTX_cleanup(md_ctx_);
+#ifdef OPENSSLOLDVERSION
+//在新的openssl版本上不是用阿！
+    EVP_MD_CTX_cleanup(ctmd_ctx_x);
     EVP_MD_CTX_destroy(md_ctx_);
+#else
+    EVP_MD_CTX_free(md_ctx_);
+#endif
+    
+    EVP_MD_CTX_free(md_ctx_);
     GENERRORPRINT("error hash sha256",0,0);
     return UTILNET_ERROR;
 }

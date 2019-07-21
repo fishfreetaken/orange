@@ -3,9 +3,13 @@
 #include <sys/wait.h>
 //#include "openssl.h"
 //std::cin.getline(buf,TMPBUFFERLEN);
+#define THISISCLIENT 
+
+
 
 int main(int argc, char*argv[])  
 {
+
     int f=-1;
     int ret=0;
     printf("argc:%d\n",argc);

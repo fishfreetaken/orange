@@ -16,7 +16,7 @@ SERVER_CC=$(CXX) $(FINAL_CFLAGS)
 SUM_SERVER_NAME=server
 SUM_CLIENT_NAME=client
 SUM_MYSQL_NAME=mysqltest
-SUM_SERVER_OBJ= main.o util.o log.o cryptmsg.o genrandom.o epollserverhandle.o epollevent.o  channel.o filehandle.o
+SUM_SERVER_OBJ= main.o log.o util.o cryptmsg.o genrandom.o epollserverhandle.o epollevent.o  channel.o filehandle.o
 SUM_CLIENT_OBJ= clientmain.o util.o cryptmsg.o log.o clientuser.o epollevent.o 
 SUM_MYSQL_OBJ= mysqltest.o genrandom.o
 

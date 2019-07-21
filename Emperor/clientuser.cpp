@@ -4,6 +4,7 @@
 #include <signal.h>
 
 
+
 epollclienthandle::epollclienthandle(size_t uid):
 fd_(0),
 uid_(uid),
@@ -64,7 +65,7 @@ int epollclienthandle::StartConnect(const char* listenip,int port)
     }
 
     setNonBlock(fd_);
-    //LOG::record(UTILLOGLEVELWORNNING, "tcpGenericConnect server fd: %d uid:%zu", fd_,uid_);
+
     try
     {
         evp_=std::make_shared<epollevent>(this,fd_);
