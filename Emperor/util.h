@@ -56,6 +56,8 @@ void printfPartner(transfPartner *m,const char *from);
 int verifyCrcPayload(transfOnPer &m);
 int genCrcPayload(transfOnPer &m);
 
+uint64_t crc64(uint64_t crc, const unsigned char *s, uint64_t l);
+
 void hexprint(unsigned char *str,int len);
 
 /*return UTILNET_SUCCESS valid */
@@ -119,6 +121,14 @@ class Status {
   // Returns the string "OK" for success.
   std::string ToString() const;
 
+    enum enCode {
+        mOk = 0,
+        mNotFound = 1,
+        mCorruption = 2,
+        mNotSupported = 3,
+        mInvalidArgument = 4,
+        mIOError = 5
+    };
 
  private:
     enum Code {
@@ -129,6 +139,8 @@ class Status {
         kInvalidArgument = 4,
         kIOError = 5
     };
+
+    
 
 
   Code code() const {
