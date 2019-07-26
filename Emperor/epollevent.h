@@ -9,6 +9,7 @@
 #define EPOLLMAXEVENTS 1024
 #define READBUFFLENMAX 512
 
+class timeevent;
 class epollhandlebase
 {
 public:
@@ -16,10 +17,11 @@ public:
     virtual void WriteEvent(int tfd)=0;
     virtual void AcceptEvent(int tfd)=0;
     virtual void DelEvent(int tfd)=0;
+    virtual void TimeoutEvent(int tfd,timeevent *t)=0;
 
     virtual int WaitTimeOut()
-    {/*0应该是立即返回 */
-        return 0;
+    {/*0立刻返回，-1一直阻塞 */
+        return -1;
     }
 
 };
@@ -62,13 +64,30 @@ public:
 
     int CurrentFdEventNum();
     int TimeEventRemove(int tfd);
+    void TimeEventAdd(int fd,size_t milisecond );
 
 private :
     int TimeExceedJudge(struct timeval &a,struct timeval &b);
     void TimeShow(struct timeval &tv);
 private :
-    std::map<int,struct timeval> ump_;
+    //std::map<int,struct timeval> ump_;
+    /*以下是lru算法 */
     std::unordered_map<int,std::list<std::pair<int,struct timeval>>::iterator > fdtopos_;
     std::list<std::pair<int,struct timeval>>  lst_;
+
+    struct basetimer {
+        int fd;
+        struct timeval v;
+        bool operator<(struct basetimer&a,struct basetimer&b)
+        {
+            if(TimeExceedJudge(a.v,b.v))
+            {
+                return true;
+            }
+            return false;
+        }
+    };
+
+    std::priority_queue<struct basetimer> pri_;
 };
 
