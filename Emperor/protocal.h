@@ -13,10 +13,16 @@ id 意义
 4 服务端获取消息:个人的uid
 5 朋友个人的信息包；
 */
-#include <string>
+
 #ifndef PAOROCAL_HEADER_
 #define PAOROCAL_HEADER_
 
+#include <stdatomic.h>
+#include "util.h"
+#include "cryptmsg.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
 
 #pragma once
 
@@ -27,46 +33,378 @@ id 意义
 #define MSGSERVERINFO   4 /*server请求初始化信息，包括个人信息，朋友信息加载 */
 #define MSGFRIENDINFO   5 /*朋友信息更新通知包 */
 
-#define PROTOCALSUCCESS 0
-#define PROTOCALUIDMATCH 1
-#define PROTOCALNOTFOUND 2
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#define LOADCHARLEN 442
+class Protocaltype{
+public:
+enum{
+    uint16_t mHeart=0;
+    uint16_t mFriend;
+    uint16_t mGroup;
+    uint16_t mSecret;
+    uint16_t mUpdateInfo;
+};
 
-#define LOADPERSONLEN 44
-#define LOADPERSONSIGNLEN 100
+static std::string toString(uint16_t &m)
+{
+    switch(m)
+    {
+        case mheart:
+            return std::string("Heart msg");
+        break;
+        case mFriend:
+            return ;
+        break;
+        case mGroup:
+            return std::string("Group msg");
+        break;
+        case mSecret:
+            return std::string("Secret msg");
+        break;
+        case mUpdateInfo:
+            return std::string("mUpdateInfo msg");
+        break;
+        default:
+            return std::string("NOT a valid msg id");
+            break;
+    }
+}
 
-#define LOADAESCRPTYKEYLEN 300
-#define LOADPERSONCRTPYLEN 40
+};
 
-typedef struct tarnsfercrptykeypacket{
-    char secret[LOADPERSONCRTPYLEN];    /*个人密码应该不能超过30个数 */
-    char key[LOADAESCRPTYKEYLEN];      /*对称加密的key */
-} transfcrptykey;
+class PersonalInfo{
+public:
+    uint32_t uiId;
+    uint8_t ucSex;
+    uint8_t ucAge;
+    uint8_t ucNation;
+    uint8_t ucState;
+    std::string sPassword; /*明文的密码？ */
+    std::string sName;
+    std::string sSignature;
+    std::string sAeskey_; /*保存aes的生成的key */
+public:
+    PersonalInfo():
+    uiId(0),
+    ucSex(0),
+    ucAge(0),
+    ucNation(0),
+    ucState(0),
+    {
+        std::memset(ucPassword,0,32);
+    }
+};
 
-typedef struct transferfriendspacket{
-    size_t uid;
-    size_t state; /*0下线，1上线 */
-    char name[LOADPERSONLEN];
-    char signature[LOADPERSONSIGNLEN];
-} transfPartner;
+#define PROTOCALVERSION     0x0001
+/*包头的版本号 */
+#define PROTOCALHEADERLEN   32
+
+#define PROTOCALHEADERFLAG  0X02
+
+#define PROTOCALHEARDBUF   0X15269CDF15
+/*主协议体 */
+class Protocal{
+public:
+    struct Header
+    {
+        uint16_t  ucFlag;       //=2
+        uint16_t  usVer;        //版本信息
+        uint16_t  usType;       //包类型
+        uint16_t  usLength;     //还是要计算长度的，对于消息体比较小的，直接使用一些填充字符进行扩展
+        uint32_t  uiSender;     //发送者id号
+        uint32_t  uiReceiver;   //接收者id号
+        size_t    ulSeq;        //包序号
+        size_t    ulTimestamp;  //时间戳
+    };
+public:
+/*发送 */
+    Protocal(int &fd,uint32_t &from,uint32_t to,uint32_t &type):
+    header_.uiSender(from),
+    header_.uiReceiver(to),
+    header_.usType(type),
+    header_.usVer(PROTOCALVERSION),
+    header_.ucFlag(PROTOCALHEADERFLAG),
+    header_.usLength(0),
+    header_.ulSeq(0),
+    buf_(nullptr),
+    buflen_(0)
+    fd_(fd),
+    ulCrc32_(0)
+    {
+        /*发送的统计计数 */
+    }
+
+    Protocal(int &fd,uint32_t &from):
+    header_.uiSender(from),
+    header_.uiReceiver(0),
+    header_.usType(0),
+    header_.usVer(PROTOCALVERSION),
+    header_.ucFlag(PROTOCALHEADERFLAG),
+    header_.usLength(0),
+    header_.ulSeq(0),
+    buf_(nullptr),
+    buflen_(0)
+    fd_(fd),
+    ulCrc32_(0)
+    {
+        /*发送的统计计数 */
+    }
+
+    /*接收 */
+    Protocal(int &fd):
+    fd_(fd)
+    {}
+
+    ~Protocal()
+    {
+        if(buf_!=nullptr)
+        {
+            delete [] buf_;
+        }
+    }
+
+    Protocal(const Protocal& m):
+    header(m.header),
+    buf_(m.buf_),
+    buflen_(m.buflen_)
+    {
+        m.buf_=nullptr;
+        m.buflen_=0;
+    }
+
+    static Protocal::DebugShow(Protocal &p)
+    {
+        printf("--------------------------------------------\n")
+        printf("current send:%u\n",sendseq_.load());
+        printf("current recv:%u\n",recvseq_.load());
+        prinf("Flag:0x%x Ver:0x%x\nType:%s\nSender:%u\nReceiver:%u\nSeq:%u\nLen:%u\n"\
+        header_.ucFlag,header_.usVer,Portocaltype::toString(header_.usType).c_str(),header_.uiSender,\
+        header.uiReceiver,header_.ulSeq,header_.usLength);
+
+        #ifdef NEEDRECORD
+            LogRecord();
+        #endif
+    }
+
+/*默认载体都是字符串的类型 */
+    void InitBuf(unsigned char *buf,uint32_t to,uint32_t &type, Basecrypt *crypt)
+    {
+        header_.uiReceiver=to;
+        header_.header_=type;
+        InitBuf(buf,crypt);
+    }
+
+    void InitBuf(unsigned char *buf, Basecrypt *crypt)
+    {
+        int len=strlen(buf);
+        if((len+8)%16!=0)
+        {
+            header_.usLength=len+16;
+        }else{
+            header_.usLength=len;
+        }
+        BufNew();
+
+        GenTimeStamp();
+
+        sendseq_++;
+        header_.ulSeq=sendseq_.load();
+
+        /*拷贝发送数据 */
+        std::memcpy(buf_,buf,len);
+        ulCrc32_=CrcGenCheck();
+        std::memcpy(buf_+header_.usLength-8,&ulCrc32_,8);
+
+        crypt->Encrypt(buf_,buflen_,buf_);
+    }
+
+    uint16_t GetPkgType(){return header_.usType_;}
+    uint32_t GetPkgSender(){return header_.uiSender_;}
+    uint32_t GetPkgReceiver(){return header_.uiReceiver_;}
+    uint32_t GetPkgSendSeq(){return sendseq_.load();}
+    uint32_t GetPkgRecvSeq(){return recvseq_.load();}
+
+    int SendPkg(){
+        /*加密 */
+        int ret=::write(fd_,(char*)&header_,PROTOCALHEADERLEN);
+        if(ret<0)
+        {
+            return Status::mIOError;
+        }
+        return write(fd_,buf_,header_.usLength);
+    }
+
+    int ReceivePkg(const Basecrypt  *crypt){
+        std::memset(header_,0,sizeof(struct Header));
+
+        if(::read(fd_,&header_,PROTOCALHEADERLEN)!=Status::mOk) {
+            if ((errno == EINTR)||(errno == EAGAIN))
+            {
+                return Status::mIOError;
+            }
+            LogError("read header failed errno: %s",strerror(errno));
+            return Status::mIOError;
+        }
+
+        BufNew();
+
+        if(::read(fd_,(char*)buf_,header_.usLength)!=Status::mOk) {
+            LogError("read buf body failed errno: %s",strerror(errno));
+            return Status::mIOError;
+        }
+
+        if((header_.ucFlag!=PROTOCALHEADERFLAG)||(header_.usVer!=PROTOCALVERSION))
+        {
+            LogError("ucFlag:%x usVer:%x mismatch",header_.ucFlag,header_.usVer);
+        }
+
+        recvseq_++;
+
+        crypt->Decrypt(buf_,header_.usLength,buf_);
+
+        std::memcpy(buf_+header_.usLength-8,&ulCrc32_,8);
+
+        if(std::strcmp(CrcGenCheck(),&ulCrc32_,8)!=Status::mOk)
+        {
+            LogError("crc query failed");
+        }
+
+        return Status::mOk;
+    }
+
+    void SetFd(int fd)
+    {
+        assert(fd<0);
+        fd_=fd;
+    }
+
+private:
+    void BufNew()
+    {
+        if(buflen_>=header_.usLength)
+        {
+            std::memset(buf_,0,buflen_);
+            return ;
+        }else{
+            if(buf_!=nullptr)
+            {
+                delete [] buf_;
+            }
+        }
+        try{
+            buf_=new unsigned char[header_.usLength];
+        }catch(buf_)
+        {
+            LogError("new buf failed len: %u\n",header_.usLength);
+            throw "Protocal new char failed!"
+        }
+        buflen_=header_.usLength;
+
+        std::memset(buf_,0,header_.usLength);
+    }
+
+    size_t CrcGenCheck()
+    {
+        size_t tmp=0;
+        tmp=crc64(0,(unsigned char*)&header_,PROTOCALHEADERLEN);
+        tmp=crc64(tmp,buf_,header_.usLength);
+        //memcmp(&tmp,&ulCrc32_,8)
+        return tmp;
+    }
+
+    void GenTimeStamp()
+    {
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        header_.ulTimestamp=tv.tv_sec;
+    }
+
+private:
+    struct Header header_;
+    unsigned char*buf_; /*数据体 */
+    uint16_t buflen_;
+    size_t ulCrc32_;
+
+    int fd_;
+    static atomic_uint sendseq_;
+    static atomic_uint recvseq_;
+};
+
+class SerialBuffer()
+{
+public:
+    SerialBuffer():
+    pos_begin_(-1),
+    pos_end_(-1),
+    buflen_(50)
+    {
+        vecbuffer_.reserve(buflen_);
+    }
+    SerialBuffer(uint32_t len):
+    pos_begin_(-1),
+    pos_end_(-1),
+    buflen_(len)
+    {
+        vecbuffer_.reserve(len);
+    }
+
+    void push();
+
+    int pop()
+    {
+       return BufferPop();
+    }
 
 
-typedef struct transferOnlinePersion{
-    uint32_t id; //=2
-    uint32_t size;
-    size_t uid;  //db根据uid进行朋友索引
-    size_t to;
-    char buf[LOADCHARLEN];
-    //char crc32[8];
-    size_t crc32;
-} transfOnPer;
+private:
+    Protocal* BufferPush()
+    {
+        pos_begin_++;
+        if(pos_begin_==buflen_)
+        {
+            pos_begin_=0;
+        }
+        if(pos_begin_==pos_end_) //buffer满了
+        {
+            return nullptr;
+        }
 
-#define STRUCTONPERLEN  sizeof(transfOnPer)
-#define STRUCTONFRILEN  sizeof(transfPartner)
+        return p= &vecbuffer_[pos_begin_];
+    }
+
+    int BufferPop()
+    {
+        if(pos_begin_==pos_end_) //buffer空的
+        {
+            return -1;
+        }
+
+        int tmp=pos_end_;
+        tmp++;
+        if(tmp==buflen_)
+        {
+            tmp=0;
+        }
+
+        if(sendbuffer_[tmp].SendPkg()!=Status::mOk)
+        {
+            return Status::mIOError;
+        }
+
+        /*发送成功了才进一步 */
+        pos_end_=tmp;
+
+        return Status::mOk;
+    }
+
+private:
+
+    const uint16_t buflen_;
+
+    int pos_begin_;
+    int pos_end_;
+
+    std::vector<Protocal> vecbuffer_;
+};
 
 #define RSAENCRYPTBUFLEN 768 //128*6  STRUCTONPERLEN/86=6;
 
