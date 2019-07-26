@@ -4,16 +4,20 @@
 #include  "openssl.h"
 #include "cryptmsg.h"
 
+int WhetherServer=0;
+
 int main()
 {
     util_init();
-
     
+#if 0
     LogInfo("Hello %d",1);
     LogWarning("hello %d",2);
     LogError("hello %d",3);
     LogRecord("hello %d",4);
     return 1;
+#endif
+
     #if 0
         cryptmsg tmp;
         tmp.GenerateKeyFiles("./rsapub.pem","./rsapriv.pem");
