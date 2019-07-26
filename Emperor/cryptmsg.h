@@ -15,6 +15,37 @@
 #define MAX_BLOCK_SIZE 128
 #define MAX_ENCRYPT_SIZE 86 //
 #define MAX_BUF_LEN 1024
+
+/*AES 加密key的长度 */
+#define AESKEYMAXLENTH 256
+
+class Basecrypt{
+public:
+    virtual int Encrypt(const unsigned char* data,size_t datalen,unsigned char *out ) =0;
+    virtual int Decrypt(const unsigned char* encryptData, size_t encryptlen,unsigned char * decryptData) =0;
+};
+
+class Aescrypt : public Basecrypt{
+public:
+    Aescrypt(char* s, uint32_t len);
+    Aescrypt();
+
+    int Encrypt(const unsigned char* data,size_t datalen,unsigned char *out );
+    int Decrypt(const unsigned char* encryptData, size_t encryptlen,unsigned char * decryptData);
+
+    void AesKeyGen(uint32_t id,const char* password);
+
+    std::string GetKey(){return aeskey_;}
+
+private:
+    std::string aeskey_; /*aes就这么一个key */
+};
+
+class Shahash:public Basecrypt{
+public:
+    int Encrypt(const unsigned char* data,size_t datalen,unsigned char *hash_data);
+};
+
 class cryptmsg{
 
 public:
@@ -37,6 +68,7 @@ public:
 
    // int AESSetDecryptKey(std::string &in);  /*设置一个对阵加密的解密的秘钥 */
     int AESGenEnCryptKey(unsigned char *s,int ctl); /*生成一个对称加密的秘钥*/
+    size_t AESBufLoadLen(size_t datalen);
 
     int GenerateKeyFiles(const char* pub_key_file, const char* priv_key_file);
     
