@@ -1,6 +1,7 @@
 #include "log.h"
 #include <sys/mman.h>
 
+extern int WhetherServer;
 /*32M*1024*1024 */
 /*
 三种类型的日志：
@@ -26,10 +27,10 @@ chat.log
 }
 */
 
-#define LOGBUFFERLEN 32*1024*1024
+#define tmpbuflen_ 512
+
 /*双buf写日志,一个日志写满了，切换另一个写，另一个起一个线程进行写文件操作； 这样如果server dump掉了日志就丢了*/
-LOG::LOG():
-tmpbuflen_(512)
+LOG::LOG()
 {
     try{
         buf_=new char[tmpbuflen_];
@@ -47,9 +48,7 @@ LOG::~LOG()
 {
     //delete [] headbufB_;
     ::close(errorfd_);
-    #ifndef THISISCLIENT
-        ::close(accessfd_);
-    #endif
+    ::close(accessfd_);
     delete [] buf_;
 }
 
@@ -62,7 +61,7 @@ LOG* LOG::GetInstance()
 
 Status LOG::Init()
 {
-    //pid_t pid = getpid();
+     pid_ = getpid();
 
     //timezone_ = getTimeZone();
     struct timeval tv;
@@ -83,16 +82,16 @@ Status LOG::Init()
     strftime(buf,tmpbuflen_,"./log/%Y_%m_%d",&tm);
     strftime(buf_,tmpbuflen_,"./log/%Y_%m_%d",&tm);
 
-#ifdef THISISCLIENT
-    sprintf(buf+strlen(buf),"_clienterror.log");
-    errorfd_= ::open(buf,O_CREAT|O_APPEND|O_WRONLY);
-    if(errorfd_<0)
+    if(!WhetherServer)
     {
-        perror("Log init failed");
-        return Status::IOError("Log init failed",nullptr);
+        sprintf(buf+strlen(buf),"_clienterror.log");
+        sprintf(buf_+strlen(buf_),"_clientaccess.log");
+    }else
+    {
+        sprintf(buf+strlen(buf),"_error.log");
+
+        sprintf(buf_+strlen(buf_),"_access.log");
     }
-#else
-    sprintf(buf+strlen(buf),"_error.log");
     errorfd_= ::open(buf,O_CREAT|O_APPEND|O_WRONLY);
     if(errorfd_<0)
     {
@@ -100,14 +99,13 @@ Status LOG::Init()
         return Status::IOError("Log init failed",nullptr);
     }
 
-    sprintf(buf_+strlen(buf_),"_access.log");
     accessfd_= ::open(buf_,O_CREAT|O_APPEND|O_WRONLY);
     if(errorfd_<0)
     {
         perror("Log access init failed");
         return Status::IOError("Log init failed",nullptr);
     }
-#endif
+
     //2019_06_05_error.log
 
     return Status();
@@ -127,9 +125,10 @@ bool LOG::AddLog(const char* pszLevel, const char* pszFile, int lineNo, const ch
     gettimeofday(&tv,NULL);
     nolocks_localtime(&tm,tv.tv_sec,timezone_,daylight_active_);
 
-    strftime(buf_,tmpbuflen_,"%H-%M-%S ",&tm);
+    strftime(buf_,tmpbuflen_,"%H:%M:%S ",&tm);
 
-    sprintf(buf_+strlen(buf_),"%s %s %s %s: ",pszLevel,pszFile,lineNo,pszFuncSig);
+    sprintf(buf_+strlen(buf_),"%d %s %s:%d %s: ",pid_,pszLevel,pszFile,lineNo,pszFuncSig);
+    
     vsprintf(buf_+strlen(buf_),pszFmt,pArgList);
     sprintf(buf_+strlen(buf_),"\n");
 
@@ -159,14 +158,15 @@ bool LOG::AddLog(const char *level,const char* pszFmt, ...)
 
     gettimeofday(&tv,NULL);
 
-    strftime(buf_,tmpbuflen_,"%H-%M-%S ",&tm);
+    strftime(buf_,tmpbuflen_,"%H:%M:%S ",&tm);
+    sprintf(buf_+strlen(buf_),"%d :",pid_);
     nolocks_localtime(&tm,tv.tv_sec,timezone_,daylight_active_);
 
     vsprintf(buf_+strlen(buf_),pszFmt,pArgList);
     sprintf(buf_+strlen(buf_),"\n");
 
     #ifdef WETHERTODEBUG
-        fprintf(stderr,"%s",buf_);
+        fprintf(stdout,"%s",buf_);
     #endif
 
     va_end(pArgList);
@@ -186,7 +186,7 @@ void LOG::WriteFd(int fd)
 {
     int ret=::write(fd,buf_,strlen(buf_));
 
-    if(ret<strlen(buf_))
+    if(ret<(int)strlen(buf_))
     {
         printf("write fd ret %d len %d failed %s",ret,strlen(buf_),strerror(errno));
     }
