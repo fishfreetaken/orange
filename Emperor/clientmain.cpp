@@ -2,13 +2,11 @@
 #include "clientuser.h"
 #include <sys/wait.h>
 //#include "openssl.h"
-//std::cin.getline(buf,TMPBUFFERLEN);
-#define THISISCLIENT 
-
-
+int WhetherServer=0;
 
 int main(int argc, char*argv[])  
 {
+    util_init();
 
     int f=-1;
     int ret=0;
