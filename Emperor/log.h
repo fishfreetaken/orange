@@ -10,10 +10,6 @@
 #define GENERALERROR -1
 #define GENERALNOTFOUND -2
 
-//都是按天创建吧
-#define SERVERERRORLOG "./log/2019_07_19_error.log"
-#define CLIENTERRORLOG "./log/2019_07_19_clienterror.log"
-#define USERCHATCLIENTLOG  //这个根据时间创建；
 
 /*log level */
 #define UTILLOGLEVELERROR       1
@@ -50,8 +46,9 @@ private:
     int accessfd_;
     time_t timezone_;
     int daylight_active_;
+    pid_t pid_;
 
-    int tmpbuflen_;
+    //const int tmpbuflen_;
 
     char *buf_;
 
