@@ -198,9 +198,7 @@ int timeevent::TimeEventRemove(int tfd)
     }
     lst_.erase(it->second);
     fdtopos_.erase(it);
-
     return 1;
-
 }
 
 int timeevent::TimeEventUpdateLRU(size_t milliseconds,int fd)
@@ -249,8 +247,43 @@ int timeevent::TimeEventProc()
         int fd=it.first;
         fdtopos_.erase(fd);
         lst_.pop_back();
+        
         return fd;
     }
+    return -1;
+}
+
+
+
+void timeevent::TimeEventAdd(int fd,size_t milisecond )
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    pri_.push(struct basetimer(fd,tv));
+}
+
+int timeevent::TimeEventProc(epollhandlebase *base)
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+
+    for(;;)
+    {
+        struct basetimer t=pri_.top();
+        if(TimeExceedJudge(tv,t.v))
+        {/*添加新的时间事件 */
+            base->TimeoutEvent(t.fd,this);
+            pri_.pop();
+        }else{
+            size_t dif=tv.tv_sec-t.v.tv_sec;
+            if(tv.tv_usec-t.v.tv_usec)
+            {
+                dif++;
+            }
+            return dif;
+        }
+    }
+    /*一直阻塞等待事件发生*/
     return -1;
 }
 
@@ -258,7 +291,7 @@ int timeevent::CurrentFdEventNum()
 {
     if(fdtopos_.size()!=lst_.size())
     {
-        GENERRORPRINT("mismatch!",fdtopos_.size(),lst_.size());
+        LogWarning("mismatch! %d %d",fdtopos_.size(),lst_.size());
     }
     return fdtopos_.size();
 }
@@ -279,5 +312,4 @@ int timeevent::TimeExceedJudge(struct timeval &a,struct timeval &b)
     }
     return 1;
 }
-
 
