@@ -5,87 +5,47 @@
 #include "cryptmsg.h"
 #include <memory>
 
-#define  CLIENTREADBUFFERLEN  1024
-#define  CLIENTWRITEBUFFERLEN 1024
-
-#define VECTORBUFFERLEN 50
-
-#if 0
-typedef struct friendsstruct{
-    int  fd;             //文件fd
-    int  uid;
-    size_t state;
-    std::string name;   //名称
-    std::string signature;
-} friends;
-#endif
-
 class epollclienthandle: public epollhandlebase{
 
 public:
-    epollclienthandle(size_t uid);
+    epollclienthandle(uint32_t uid,char *password);
     ~epollclienthandle();
     int StartConnect(const char* listenip,int port);
 
 public:
     void ReadEvent(int tfd);
-    void WriteEvent(int tfd); //标准输出端口输出
     void AcceptEvent(int tfd);
     void DelEvent(int tfd);
-    int WaitTimeOut();
+    int  WaitTimeOut();
+    void TimeoutEvent(int tfd,timeevent *t);
 
 private:
     int FormMsgAddToBuffer(uint32_t msgid,const char*buf,int len,size_t to);
     int MsgSendFromStd0();
 
-
-    int PushMsgToTerminal(transfOnPer *p);
+    int  PushMsgToTerminal(transfOnPer *p);
     void AddNewFriends(transfOnPer *p);
     void InintialMyInfo(transfOnPer *p);
 
     int UserSendMsgPoll();
 
-    transfOnPer * SendBufferPush();
-    int SendBufferPop();
-    //transfOnPer *SendBufferPop();
-
-    void ShowPacketInfo();
-    //void SingalCallBack(int t);
-
 private :
     int fd_;
-    size_t uid_;
+    PersonalInfo myinfo_;
+    const uint32_t uiHeartInterval_;
+
     std::shared_ptr<epollevent> evp_;
-
-    std::shared_ptr<cryptmsg> crypt_;
-
-    //std::vector<transfOnPer> recvbuffer_;
-    std::vector<transfOnPer> sendbuffer_;
-
-    char *readbuffer_;
-    char *serverbuffer_;
-    
-    transfOnPer recvpacketbuf_;
-
-    //int recv_pos_begin_;
-    //int recv_pos_end_;
-
-    int send_pos_begin_;
-    int send_pos_end_;
-
+    std::shared_ptr<Aescrypt> aescrypt_;
     std::shared_ptr<timeevent> tme_;
-    std::vector<int> timerollback_;
-    transfPartner myinfo_;
 
-    std::map<size_t, transfPartner> myfriends_;
-    size_t curdialog_; /*当前对话的伙伴 */
+    std::map<size_t, PersonalInfo> myfriends_;
+    uint32_t curdialog_; /*当前对话的伙伴 */
 
-    size_t recpackagecount_;
-    size_t sendpackagecount_;
+    int epolltimeout_;
+    /*发送消息的循环缓冲数组 */
+    std::shared_ptr<SerialBuffer> sendqueue_;
 
-    uint32_t sendfailedcount_;
-
-    size_t heart_count_;
+    std::shared_ptr<Protocal> recpacket_;
 };
 
 
