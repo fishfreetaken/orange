@@ -84,18 +84,20 @@ int tcpGenericConnect(const char *source_addr,int port,const char *dest_ip,int d
     hints.ai_socktype = SOCK_STREAM;
 
     if (getaddrinfo(dest_ip,portstr,&hints,&servinfo) != 0) {
-        LOG::record(UTILLOGLEVELERROR, "getaddrinfo: %s", strerror(errno));
-        return UTILNET_ERROR;
+        LogError("getaddrinfo: %s", strerror(errno));
+        return Status::mInvalidArgument;
     }
+
     int socket_fd;
     if ((socket_fd = socket(servinfo->ai_family,servinfo->ai_socktype,servinfo->ai_protocol)) == -1)
     {
-        LOG::record(UTILLOGLEVELERROR, "clinet socket: %s", strerror(errno));
+        LogError("clinet socket: %s", strerror(errno));
         goto error;
     }
 
     if (setResusedConfig(socket_fd)<0)
     {
+        LogError("set Resused config failed", strerror(errno));
         goto error;
     }
 
@@ -114,11 +116,11 @@ int tcpGenericConnect(const char *source_addr,int port,const char *dest_ip,int d
         hints.ai_flags = AI_PASSIVE;
         if (getaddrinfo(source_addr, srcport, &hints, &bservinfo) != 0)
         {
-            LOG::record(UTILLOGLEVELERROR, "source_addr getaddrinfo: %s", strerror(errno));
+            LogError("source_addr getaddrinfo: %s", strerror(errno));
             goto error;
         }
         if(bind(socket_fd,bservinfo->ai_addr,bservinfo->ai_addrlen)!=-1){
-            LOG::record(UTILLOGLEVELERROR, "source_addr bind: %s", strerror(errno));
+            LogError("source_addr bind: %s", strerror(errno));
         }
     }
 
@@ -130,16 +132,19 @@ int tcpGenericConnect(const char *source_addr,int port,const char *dest_ip,int d
         }else{
             goto error;
         }
-        LOG::record(UTILLOGLEVELERROR, "connect: %s", strerror(errno));
+        LogError("connect: %s", strerror(errno));
     }
+
+    LogRecord("client connect success dest_ip:%s dest_port:%d",dest_ip,dest_port);
+    setNonBlock(fd_);
     goto end;
+
 error:
     if (socket_fd != -1) 
     {
         close(socket_fd);
         socket_fd=-1;
     }
-    
 end:
     freeaddrinfo(servinfo);
     return socket_fd;
@@ -180,11 +185,10 @@ int readGenericReceive(int fd, char* buf,int len)
             if ((errno == EINTR)||(errno == EAGAIN))
             {
                 //LOG::record(UTILNET_ERROR,"%s LINE:%d readfail:%s \n",__FUNCTION__,__LINE__,strerror(errno));
-                return ret;
-            }else{
-                LOG::record(UTILNET_ERROR,"%s readfail %d:%s \n",__FUNCTION__,errno,strerror(errno));
-                return UTILLOGLEVELERROR; 
+                continue;
             }
+            //    LOG::record(UTILNET_ERROR,"%s readfail %d:%s \n",__FUNCTION__,errno,strerror(errno));
+            return Status::mIOError;
         }
         break;
     }while(0);
