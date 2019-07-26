@@ -3,20 +3,144 @@
 #include "cryptmsg.h"
 #include "util.h"
 
- #include <openssl/rand.h>
+#include <openssl/rand.h>
+
+/*低版本不支持一些特性 */
+#define OPENSSLOLDVERSION
 
 //#define PASSWORDKEY "12345678"
 #define PASSWORDKEY "donggeshidalao"
 
+int Shahash::Encrypt(const unsigned char* data,size_t datalen,unsigned char *hash_data)
+{
+    unsigned int val=0;
+    EVP_MD_CTX *ctx=nullptr;
+    if(hash_data==nullptr)
+    {
+        LogError("hash data is null");
+        return Status::mInvalidArgument;
+    }
+    ctx=EVP_MD_CTX_create();
+    
+    if(EVP_DigestInit_ex(ctx, EVP_sha256(), NULL)<=0)
+    {
+        goto error;
+    }
+
+    if(EVP_DigestUpdate(ctx,data,datalen)<0)
+    {
+        goto error;
+    }
+
+    if(EVP_DigestFinal_ex(ctx,hash_data,&val))
+    {
+        goto error;
+    }
+
+#ifdef OPENSSLOLDVERSION
+//在新的openssl版本上不是用阿！
+    EVP_MD_CTX_cleanup(ctx);
+    EVP_MD_CTX_destroy(ctx);
+#else
+    EVP_MD_CTX_free(ctx);
+#endif
+
+    if(val!=32)
+    {
+        LogError("not valid hash len %d val:%d",datalen,val);
+        goto error;
+    }
+
+    return Status::mOk;
+
+error:
+#ifdef OPENSSLOLDVERSION
+//在新的openssl版本上不是用阿！
+    EVP_MD_CTX_cleanup(ctx);
+    EVP_MD_CTX_destroy(ctx);
+#else
+    EVP_MD_CTX_free(ctx);
+#endif
+
+    return Status::mCorruption;
+}
+
+Aescrypt::Aescrypt(char *c,uint32_t len):
+aeskey_.assign(c,len)
+{
+}
+
+int Aescrypt::Encrypt(const unsigned char* data,size_t datalen,unsigned char *out )
+{
+    if(aeskey_.size()==0)
+    {
+        LogError("Aescrypt::Encrypt failed");
+        return Status::mInvalidArgument;
+    }
+    if((out==nullptr)||(data==nullptr))
+    {
+        LogError("out or data is nullptr");
+        return Status::mInvalidArgument;
+    }
+
+    AES_KEY aes_ks3;
+
+    AES_set_encrypt_key((unsigned char*)aeskey_.c_str(), aeskeylen_, &aes_ks3);
+    size_t cutup= datalen/AES_BLOCK_SIZE;
+    size_t minus= datalen%AES_BLOCK_SIZE;
+    size_t i =0;
+    for(i=0;i < cutup; i++)
+    {
+        AES_cbc_encrypt(data+i*AES_BLOCK_SIZE,out+i*AES_BLOCK_SIZE,AES_BLOCK_SIZE,&aes_ks3,iv_,1);
+    }
+    if(minus!=0)
+    {
+        AES_cbc_encrypt(data+i*AES_BLOCK_SIZE,out+i*AES_BLOCK_SIZE,minus,&aes_ks3,iv_,1);
+    }
+    
+    return Status::mOk;
+}
+
+int Aescrypt::Decrypt(const unsigned char* encryptData, size_t encryptlen,unsigned char * decryptData)
+{
+    if(aeskey_.size()==0)
+    {
+        LogError("Aescrypt::Decrypt failed");
+        return Status::mInvalidArgument;
+    }
+    if((encryptData==nullptr)||(decryptData==nullptr))
+    {
+        LogError("encryptData or decryptData is nullptr");
+        return Status::mInvalidArgument;
+    }
+    AES_KEY aes_ksd3;
+    AES_set_decrypt_key((unsigned char*)aeskey_.c_str(), aeskeylen_, &aes_ksd3);
+
+    size_t cutup= encryptData_len/AES_BLOCK_SIZE;
+    size_t minus= encryptData_len%AES_BLOCK_SIZE;
+    size_t i =0;
+    for(i=0;i < cutup; i++)
+    {
+        AES_cbc_encrypt(encryptData+i*AES_BLOCK_SIZE,decryptData+i*AES_BLOCK_SIZE,AES_BLOCK_SIZE,&aes_ksd3,iv_,0);
+    }
+    if(minus!=0)
+    {
+        AES_cbc_encrypt(encryptData+i*AES_BLOCK_SIZE,decryptData+i*AES_BLOCK_SIZE,minus,&aes_ksd3,iv_,0);
+    }
+
+    return Status::mOk;
+}
+
+
+
 cryptmsg::cryptmsg()
-{    
+{
     std::memset(iv_,0,MAX_BLOCK_SIZE);
     std::memset(passwd_,0,MAX_BLOCK_SIZE);
 
     int ret=0;
     ret=sprintf((char*)iv_,"jofjwoiiewi23");
     ret=sprintf((char*)passwd_,PASSWORDKEY);
-
 }
 
 cryptmsg::cryptmsg(const char*s):
@@ -68,8 +192,6 @@ void cryptmsg::cryptmsg(std::string &aesdekey);
     aesdekey_.assign(aesdekey);
 }
 */
-
-
 int cryptmsg::AcquireRsaPubKey()
 {
 
@@ -213,6 +335,16 @@ int cryptmsg::AESDecrypt(const unsigned char* encryptData,size_t encryptData_len
 
 
     return 0;
+}
+
+size_t cryptmsg::AESBufLoadLen(size_t datalen)
+{
+    size_t tmp=datalen/AES_BLOCK_SIZE;
+    if(datalen%AES_BLOCK_SIZE)
+    {
+        tmp++;
+    }
+    return tmp*AES_BLOCK_SIZE;
 }
 
 int cryptmsg::AESEncrypt(const unsigned char* data,size_t datalen,unsigned char *out, size_t outlen )
@@ -478,10 +610,11 @@ int cryptmsg::Sha256Hash(const unsigned char* data,size_t datalen,unsigned char 
         goto error;
     }
 
-    if(EVP_DigestFinal_ex(ctx,hash_data,&val))
+    if(EVP_DigestFinal_ex(ctx,hash_data,&val)<0)
     {
         goto error;
     }
+
 
 #ifdef OPENSSLOLDVERSION
 //在新的openssl版本上不是用阿！
@@ -558,13 +691,12 @@ int cryptmsg::Sha256HashUpdate(const unsigned char* data,size_t datalen,unsigned
 error:
 #ifdef OPENSSLOLDVERSION
 //在新的openssl版本上不是用阿！
-    EVP_MD_CTX_cleanup(ctmd_ctx_x);
+    EVP_MD_CTX_cleanup(md_ctx_);
     EVP_MD_CTX_destroy(md_ctx_);
 #else
     EVP_MD_CTX_free(md_ctx_);
 #endif
     
-    EVP_MD_CTX_free(md_ctx_);
     GENERRORPRINT("error hash sha256",0,0);
     return UTILNET_ERROR;
 }
