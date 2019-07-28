@@ -141,25 +141,6 @@ int epollevent::EpollDelEvent(int fd)
     return ret;
 }
 
-
-int timeevent::TimeEventUpdate(size_t milliseconds,int fd)
-{
-    /* 不管fd是否已经存在，都进行更新/添加新的时间事件*/
-
-    //LOG::record(UTILLOGLEVELRECORD,"%d TimeEventUpdate : milliseconds:%zu\n",fd,milliseconds);
-    struct timeval tv;
-
-    gettimeofday(&tv, NULL);
-    //TimeShow(tv);
-
-    tv.tv_usec += milliseconds * 1000;
-    tv.tv_sec += tv.tv_usec/1000000;
-    tv.tv_usec = tv.tv_usec %1000000;
-    ump_[fd] = tv;
-    //TimeShow(tv);
-    return 0;
-}
-
 void timeevent::TimeShow( struct timeval &tv)
 {
     printf("======TimeShow==start=====\n");
@@ -167,27 +148,7 @@ void timeevent::TimeShow( struct timeval &tv)
     printf("sec:%ld\n",tv.tv_sec);
     printf("======TimeShow==end=====\n");
 }
-/*这个应该使用一个lru算法进行剔除 */
-int timeevent::TimeEventProc(std::vector<int> &m)
-{
-    //std::vector<int> m;
-    struct timeval tv;
-    int ret=0;
 
-    gettimeofday(&tv, NULL);
-    for(auto it=ump_.begin();it!=ump_.end();)
-    {
-        if(TimeExceedJudge(tv,it->second))
-        {
-            m.push_back(it->first);
-            it= ump_.erase(it); //从队列中删除
-            ret++;
-        }else{
-            it++;
-        }
-    }
-    return ret;
-}
 
 int timeevent::TimeEventRemove(int tfd)
 {
@@ -259,7 +220,10 @@ void timeevent::TimeEventAdd(int fd,size_t milisecond )
 {
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    pri_.push(struct basetimer(fd,tv));
+    struct basetimer t;
+    t.fd=fd;
+    t.v=tv;
+    pri_.push(t);
 }
 
 int timeevent::TimeEventProc(epollhandlebase *base)
@@ -295,6 +259,7 @@ int timeevent::CurrentFdEventNum()
     }
     return fdtopos_.size();
 }
+
 
 int timeevent::TimeExceedJudge(struct timeval &a,struct timeval &b)
 {

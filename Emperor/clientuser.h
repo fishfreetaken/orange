@@ -4,13 +4,14 @@
 #include "epollevent.h"
 #include "cryptmsg.h"
 #include <memory>
+#include <queue>
 
 class epollclienthandle: public epollhandlebase{
 
 public:
     epollclienthandle(uint32_t uid,char *password);
     ~epollclienthandle();
-    int StartConnect(const char* listenip,int port);
+    void StartConnect(const char* listenip,int port);
 
 public:
     void ReadEvent(int tfd);
@@ -29,6 +30,8 @@ private:
 
     int UserSendMsgPoll();
 
+    void InitAesKeySend();
+
 private :
     int fd_;
     PersonalInfo myinfo_;
@@ -38,14 +41,16 @@ private :
     std::shared_ptr<Aescrypt> aescrypt_;
     std::shared_ptr<timeevent> tme_;
 
-    std::map<size_t, PersonalInfo> myfriends_;
+    std::map <uint32_t, PersonalInfo > myfriends_;
     uint32_t curdialog_; /*当前对话的伙伴 */
 
     int epolltimeout_;
     /*发送消息的循环缓冲数组 */
-    std::shared_ptr<SerialBuffer> sendqueue_;
 
     std::shared_ptr<Protocal> recpacket_;
+
+    /*最后一个发送完的自动进行释放 */
+    std::queue<std::shared_ptr<Protocal> > sendqueue_;
 };
 
 

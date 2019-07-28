@@ -31,6 +31,7 @@
 #include "protocal.h"
 #include "log.h"
 #include <assert.h>
+#include <cassert>
 
 #define UTILNET_SUCCESS       0
 #define UTILNET_ERROR        -1
@@ -66,6 +67,26 @@ int checkMsgIdValid(uint32_t t);
 void util_init();
 
 void nolocks_localtime(struct tm *tmp, time_t t, time_t tz, int dst);
+
+class Statustype{
+
+public:
+  static int Ok(){ return  static_cast<int>(mOk);}
+  static int NotFound(){ return  static_cast<int>(mNotFound);}
+  static int Corruption(){ return  static_cast<int>(mCorruption);}
+  static int InvalidArgument(){ return  static_cast<int>(mInvalidArgument);}
+  static int IOError(){ return  static_cast<int>(mIOError);}
+
+private:
+  enum enCode {
+        mOk = 0,
+        mNotFound = 1,
+        mCorruption = 2,
+        mNotSupported = 3,
+        mInvalidArgument = 4,
+        mIOError = 5
+    };
+};
 
 class Status {
  public:
@@ -139,9 +160,6 @@ class Status {
         kInvalidArgument = 4,
         kIOError = 5
     };
-
-    
-
 
   Code code() const {
     return (state_ == nullptr) ? kOk : static_cast<Code>(state_[4]);

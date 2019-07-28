@@ -10,6 +10,7 @@
 #include <openssl/engine.h>
 
 #include <string>
+
 #define CRYPTTYPERSA 1
 
 #define MAX_BLOCK_SIZE 128
@@ -19,6 +20,7 @@
 /*AES 加密key的长度 */
 #define AESKEYMAXLENTH 256
 
+class PersonalInfo;
 class Basecrypt{
 public:
     virtual int Encrypt(const unsigned char* data,size_t datalen,unsigned char *out ) =0;
@@ -28,17 +30,21 @@ public:
 class Aescrypt : public Basecrypt{
 public:
     Aescrypt(char* s, uint32_t len);
+    Aescrypt(uint32_t len);/*自动生成一个len长度的key进行初始化 */
     Aescrypt();
 
     int Encrypt(const unsigned char* data,size_t datalen,unsigned char *out );
     int Decrypt(const unsigned char* encryptData, size_t encryptlen,unsigned char * decryptData);
 
-    void AesKeyGen(uint32_t id,const char* password);
+    void AesKeyGen(PersonalInfo& f); /*通过 */
+
+    void AESGenEnCryptKey(unsigned char *s,int ctl);
 
     std::string GetKey(){return aeskey_;}
 
 private:
     std::string aeskey_; /*aes就这么一个key */
+    unsigned char iv_[MAX_BLOCK_SIZE];      //="jofjwoiiewi23";
 };
 
 class Shahash:public Basecrypt{

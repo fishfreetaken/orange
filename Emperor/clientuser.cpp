@@ -7,11 +7,11 @@
 epollclienthandle::epollclienthandle(uint32_t uid,char *password):
 fd_(-1),
 curdialog_(0),
-myinfo_.uiId(uid),
-myinfo_.sPassword.assign(password),
 epolltimeout_(-1),
 uiHeartInterval_(1000) //1s的间隔
 {
+    myinfo_.uiId=uid;
+    myinfo_.sPassword.assign(password);
 }
 
 epollclienthandle::~epollclienthandle()
@@ -33,43 +33,28 @@ void SingalCallBack(int signale_number)
     printf("encounter SIGPIPE t=%d\n",signale_number);
 }
 
-int epollclienthandle::StartConnect(const char* listenip,int port)
+void epollclienthandle::StartConnect(const char* listenip,int port)
 {
 
     fd_=tcpGenericConnect(NULL,0,listenip,port);
-    if(fd_<0) {return Status::mIOError;}
-    recpacket_.SetFd(fd_);
+    std::assert(fd<0);
 
     try
     {
         evp_=std::make_shared<epollevent>(this,fd_);
-        tme_=std::make_shared<timeevent>();
-        aescrypt_=std::make_shared<Aescrypt>();
-        sendqueue_=std::make_shared<SerialBuffer>();
-        recpacket_ = std::make_shared<Protocal>(fd_);
+        if(tme_==nullptr)
+        {
+            tme_=std::make_shared<timeevent>();
+            aescrypt_=std::make_shared<Aescrypt>();
+            recpacket_ = std::make_shared<Protocal>();
+        }
     }catch (...){
         throw  "clientuser new failed";
     }
 
-    /*加密协议消息 */
-    /*直接使用用户名密码进行替换，生成256字节的对称加密秘钥；sha(sha(随机串))+sha(id)+sha(密码)+sha(id+密码)+shasha(id)+shasha(密码)+shasha(id+密码)+sha(随即串) */
-
-    /*生成完直接拷贝到这个结构体中，设置myinf_的字符串*/
-    if(aescrypt_->AesKeyGen(myinfo_)!=Statue::mOk)
-    {
-        LogError("AesKeyGen generator failed %d",ret);
-    }
-
-    sendqueue_.push(Protoal(fd_,Protocaltype::mSecret,myinfo_));
+    InitAesKeySend();
 
     tme_->TimeEventAdd(fd_,uiHeartInterval_);/*server 心跳事件 */
-
-    /*标准输入输出 */
-    //setNonBlock(0);
-    struct epoll_event ee = {0,0};
-    ee.events |=  EPOLLIN | EPOLLET;
-    ee.data.fd=0; //注册用户标准输入stdio 0事件；
-    evp_->EpollEventAdd(ee);
 
     //signal(SIGPIPE,SingalCallBack);
     /*当主控断开后，会由于SIGPIPE信号导致进程中断，这个也是断线重连机制的基础 */
@@ -77,6 +62,21 @@ int epollclienthandle::StartConnect(const char* listenip,int port)
 
     while(1)
     {
+        /*发送消息 */
+        if(sendqueue_.front()->SendPkg(fd_)!=Statustype::Ok())
+        {
+            //if(errno==EWOULDBLOCK)
+            /*说明对面主动断开，推出或者重新建立连接 */
+            if(errno==EPIPE)
+            {
+                errno=0;
+                DelEvent(fd_);
+                LogRecord("EPIPE error fd: %d, %s\n",fd_,sterrno(errno));
+                break;
+            }
+        }
+        sendqueue_.pop();
+
         //程序主入口，按照redis的方法，对于下次的轮训时间设置为最近快要过期的时间
         if(evp_->EpollEventWaite()<0)
         {
@@ -84,44 +84,64 @@ int epollclienthandle::StartConnect(const char* listenip,int port)
         }
         /*执行定时事件 */
         epolltimeout_=tme_->TimeEventProc(this);
-
-        /*发送消息 */
-        sendqueue_.pop();
     }
+}
 
-    return Status::mOk;
+void epollclienthandle::InitAesKeySend()
+{
+    /*加密协议消息 */
+    /*直接使用用户名密码进行替换，生成256字节的对称加密秘钥；sha(sha(随机串))+sha(id)+sha(密码)+sha(id+密码)+shasha(id)+shasha(密码)+shasha(id+密码)+sha(随即串) */
+
+    /*生成完直接拷贝到这个结构体中，设置myinf_的字符串*/
+    aescrypt_->AesKeyGen(myinfo_);
+    std::shared_ptr<Protocal> p=std::make_shared<Protocal>(Protocaltype::Secret(),0,myinfo_.uiId);
+
+    p->InitBuf(myinfo_.sPassword,aescrypt_.get());
+
+    /*需要password的sha这一个信息就够了,key对面知道 */
+    sendqueue_->push(p);
+
+    /*标准输入输出 */
+    setNonBlock(0);
+    struct epoll_event ee = {0,0};
+    ee.events |=  EPOLLIN | EPOLLET;
+    ee.data.fd=0; //注册用户标准输入stdio 0事件；
+    evp_->EpollEventAdd(ee);
 }
 
 /*从server端收到的数据 */
 void epollclienthandle::AcceptEvent(int fd)
 {
-    int ret=0;
-
-    while(recpacket_.ReceivePkg(aescrypt_)==Status::mOk)/*一次并不能读完 */
+    while(recpacket_->ReceivePkg(fd,aescrypt_)==Statustype::Ok())/*一次并不能读完 */
     {
-        switch(p->id)
+        if(recpacket_->CrcCheck()!=Statustype::Ok())
+        {
+            LogError("Crc check failed");
+            Protocal::DebugShow(*(recpacket_.get()));
+            continue;
+        }
+        switch(recpacket_->GetPkgType())
         {
             case MSGHEART:
-                //printf("Server reback num %zu\n",*(p->buf));
                 break;
             case MSGFRIEND:
-                PushMsgToTerminal(p);
+                PushMsgToTerminal();
                 break;
             case MSGSERVERINFO:
-                InintialMyInfo(p);
+                InintialMyInfo();
                 break;
             case MSGFRIENDINFO:
-                AddNewFriends(p);
+                AddNewFriends();
                 break;
             default:
-                LOG::record(UTILLOGLEVELWORNNING, "not recoginsed tid: %d", p->id);
+                LogError("not recoginsed tid: %d", p->id);
                 return;
                 break;
         }
     }
 }
 
-void epollclienthandle::TimeoutEvent(int tfd, timeevent *t);
+void epollclienthandle::TimeoutEvent(int tfd, timeevent *t)
 {
     /*服务器定时心跳事件 */
     if(tfd==fd_)
@@ -137,26 +157,13 @@ void epollclienthandle::DelEvent(int tfd)
     ::close(tfd);
 }
 
-void epollclienthandle::WriteEvent(int tfd)
-{
-    if(tfd==fd_)
-    {
-        UserSendMsgPoll();
-    }
-    //LOG::record(UTILLOGLEVELERROR, "reservered %d", tfd);
-    return ;
-}
-
 /*标准设备读入事件 */
 void epollclienthandle::ReadEvent(int tfd)
 {
     int ret;
     std::memset(readbuffer_,0,CLIENTWRITEBUFFERLEN);
     ret=readGenericReceive(0,readbuffer_,CLIENTREADBUFFERLEN);
-    if(ret<0)
-    {
-        return ret;
-    }
+
     auto it=myfriends_.begin();
     if(it==myfriends_.end())
     {
@@ -165,36 +172,6 @@ void epollclienthandle::ReadEvent(int tfd)
     }
     
     curdialog_=it->second.uid;
-}
-
-int epollclienthandle::UserSendMsgPoll()
-{
-    int ret=0;
-    transfOnPer * p;
-    while(SendBufferPop()==0){}
-    /*表示对端主动断开连接 */
-    if(errno==EPIPE)
-    {
-        errno=0;
-        DelEvent(fd_);
-        LogRecord("EPIPE error fd: %d, %s\n",fd_,sterrno(errno));
-        return errno;
-    }
-    /*网线断了，或者buf满了 */
-    #if 0
-    if(errno==EWOULDBLOCK)
-    {
-        GENERRORPRINT("errno EWOULDBLOCK",errno,sendfailedcount_);
-        if(sendfailedcount_>300)
-        {/*检测如果断线了话，就进行重新连接 */
-            sendfailedcount_=0;
-            return errno;
-        }else{
-            sendfailedcount_++;
-        }
-    }
-    #endif
-    return UTILNET_SUCCESS;
 }
 
 void epollclienthandle::InintialMyInfo()

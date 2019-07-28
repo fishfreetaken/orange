@@ -36,40 +36,51 @@ id 意义
 
 class Protocaltype{
 public:
-enum{
-    uint16_t mHeart=0;
-    uint16_t mFriend;
-    uint16_t mGroup;
-    uint16_t mSecret;
-    uint16_t mUpdateInfo;
-};
-
-static std::string toString(uint16_t &m)
-{
-    switch(m)
+    static std::string toString(uint16_t &m)
     {
-        case mheart:
-            return std::string("Heart msg");
-        break;
-        case mFriend:
-            return ;
-        break;
-        case mGroup:
-            return std::string("Group msg");
-        break;
-        case mSecret:
-            return std::string("Secret msg");
-        break;
-        case mUpdateInfo:
-            return std::string("mUpdateInfo msg");
-        break;
-        default:
-            return std::string("NOT a valid msg id");
+        switch(m)
+        {
+            case mHeart:
+                return std::string("Heart msg");
             break;
+            case mFriMsg:
+                return ;
+            break;
+            case mGroMsg:
+                return std::string("Group msg");
+            break;
+            case mSecret:
+                return std::string("Secret msg");
+            break;
+            case mUpdateInfo:
+                return std::string("mUpdateInfo msg");
+            break;
+            default:
+                return std::string("NOT a valid msg id");
+                break;
+        }
     }
-}
 
+    static uint16_t Heart(){ return  static_cast<uint16_t>(mHeart);}
+    static uint16_t FriendMsg(){ return  static_cast<uint16_t>(mFriMsg);}
+    static uint16_t GroupMsg(){ return  static_cast<uint16_t>(mGroMsg);}
+    static uint16_t Secret(){ return  static_cast<uint16_t>(mSecret);}
+    static uint16_t UpdateInfo(){ return  static_cast<uint16_t>(mUpdateInfo);}
+
+    virtual void MsgProc(uint16_t &m);
+
+private:
+    enum enType {
+        mHeart=0,
+        mFriMsg,
+        mGroMsg ,
+        mSecret ,
+        mUpdateInfo
+    };
+
+    std::vector<std::function> vef_;
 };
+
 
 class PersonalInfo{
 public:
@@ -78,19 +89,17 @@ public:
     uint8_t ucAge;
     uint8_t ucNation;
     uint8_t ucState;
-    std::string sPassword; /*明文的密码？ */
+    std::string sPassword; /*sha后的密码 */
     std::string sName;
     std::string sSignature;
-    std::string sAeskey_; /*保存aes的生成的key */
 public:
     PersonalInfo():
     uiId(0),
     ucSex(0),
     ucAge(0),
     ucNation(0),
-    ucState(0),
+    ucState(0)
     {
-        std::memset(ucPassword,0,32);
     }
 };
 
@@ -103,7 +112,6 @@ public:
 #define PROTOCALHEARDBUF   0X15269CDF15
 /*主协议体 */
 class Protocal{
-public:
     struct Header
     {
         uint16_t  ucFlag;       //=2
@@ -117,42 +125,23 @@ public:
     };
 public:
 /*发送 */
-    Protocal(int &fd,uint32_t &from,uint32_t to,uint32_t &type):
-    header_.uiSender(from),
-    header_.uiReceiver(to),
-    header_.usType(type),
-    header_.usVer(PROTOCALVERSION),
-    header_.ucFlag(PROTOCALHEADERFLAG),
-    header_.usLength(0),
-    header_.ulSeq(0),
-    buf_(nullptr),
-    buflen_(0)
-    fd_(fd),
-    ulCrc32_(0)
+    Protocal()
     {
-        /*发送的统计计数 */
     }
 
-    Protocal(int &fd,uint32_t &from):
-    header_.uiSender(from),
-    header_.uiReceiver(0),
-    header_.usType(0),
-    header_.usVer(PROTOCALVERSION),
-    header_.ucFlag(PROTOCALHEADERFLAG),
-    header_.usLength(0),
-    header_.ulSeq(0),
+    Protocal(uint32_t &type,uint32_t to,uint32_t from):
     buf_(nullptr),
-    buflen_(0)
-    fd_(fd),
+    buflen_(0),
     ulCrc32_(0)
     {
-        /*发送的统计计数 */
+        header_.uiSender=from;
+        header_.uiReceiver=to;
+        header_.usType=type;
+        header_.usVer=PROTOCALVERSION;
+        header_.ucFlag=PROTOCALHEADERFLAG;
+        header_.usLength=0;
+        header_.ulSeq=0;
     }
-
-    /*接收 */
-    Protocal(int &fd):
-    fd_(fd)
-    {}
 
     ~Protocal()
     {
@@ -162,8 +151,8 @@ public:
         }
     }
 
-    Protocal(const Protocal& m):
-    header(m.header),
+    Protocal(Protocal& m):
+    header_(m.header_),
     buf_(m.buf_),
     buflen_(m.buflen_)
     {
@@ -171,37 +160,31 @@ public:
         m.buflen_=0;
     }
 
-    static Protocal::DebugShow(Protocal &p)
+    static void DebugShow(Protocal &p)
     {
-        printf("--------------------------------------------\n")
+        printf("--------------------------------------------\n");
         printf("current send:%u\n",sendseq_.load());
         printf("current recv:%u\n",recvseq_.load());
-        prinf("Flag:0x%x Ver:0x%x\nType:%s\nSender:%u\nReceiver:%u\nSeq:%u\nLen:%u\n"\
-        header_.ucFlag,header_.usVer,Portocaltype::toString(header_.usType).c_str(),header_.uiSender,\
-        header.uiReceiver,header_.ulSeq,header_.usLength);
+        printf("Flag:0x%x Ver:0x%x\nType:%s\nSender:%u\nReceiver:%u\nSeq:%u\nLen:%u\n",\
+        p.header_.ucFlag,p.header_.usVer,Protocaltype::toString(p.header_.usType).c_str(),p.header_.uiSender,\
+        p.header_.uiReceiver,p.header_.ulSeq,p.header_.usLength);
 
         #ifdef NEEDRECORD
             LogRecord();
         #endif
     }
 
-/*默认载体都是字符串的类型 */
-    void InitBuf(unsigned char *buf,uint32_t to,uint32_t &type, Basecrypt *crypt)
+    /*默认载体都是字符串的类型 */
+    void InitBuf( std::string &st, Basecrypt *crypt)
     {
-        header_.uiReceiver=to;
-        header_.header_=type;
-        InitBuf(buf,crypt);
-    }
-
-    void InitBuf(unsigned char *buf, Basecrypt *crypt)
-    {
-        int len=strlen(buf);
+        int len=st.size();
         if((len+8)%16!=0)
         {
             header_.usLength=len+16;
         }else{
             header_.usLength=len;
         }
+        /*分配新的空间 */
         BufNew();
 
         GenTimeStamp();
@@ -210,46 +193,46 @@ public:
         header_.ulSeq=sendseq_.load();
 
         /*拷贝发送数据 */
-        std::memcpy(buf_,buf,len);
+        std::memcpy(buf_,st.c_str(),len);
         ulCrc32_=CrcGenCheck();
         std::memcpy(buf_+header_.usLength-8,&ulCrc32_,8);
 
         crypt->Encrypt(buf_,buflen_,buf_);
     }
 
-    uint16_t GetPkgType(){return header_.usType_;}
-    uint32_t GetPkgSender(){return header_.uiSender_;}
-    uint32_t GetPkgReceiver(){return header_.uiReceiver_;}
+    uint16_t GetPkgType(){return header_.usType;}
+    uint32_t GetPkgSender(){return header_.uiSender;}
+    uint32_t GetPkgReceiver(){return header_.uiReceiver;}
     uint32_t GetPkgSendSeq(){return sendseq_.load();}
     uint32_t GetPkgRecvSeq(){return recvseq_.load();}
 
-    int SendPkg(){
+    int SendPkg(int fd_){
         /*加密 */
         int ret=::write(fd_,(char*)&header_,PROTOCALHEADERLEN);
         if(ret<0)
         {
-            return Status::mIOError;
+            return Statustype::IOError();
         }
         return write(fd_,buf_,header_.usLength);
     }
 
-    int ReceivePkg(const Basecrypt  *crypt){
-        std::memset(header_,0,sizeof(struct Header));
+    int ReceivePkg(int fd_, Basecrypt  *crypt){
+        std::memset(&header_,0,sizeof(struct Header));
 
         if(::read(fd_,&header_,PROTOCALHEADERLEN)!=Status::mOk) {
             if ((errno == EINTR)||(errno == EAGAIN))
             {
-                return Status::mIOError;
+                return Statustype::IOError();
             }
             LogError("read header failed errno: %s",strerror(errno));
-            return Status::mIOError;
+            return Statustype::IOError();
         }
 
         BufNew();
 
         if(::read(fd_,(char*)buf_,header_.usLength)!=Status::mOk) {
             LogError("read buf body failed errno: %s",strerror(errno));
-            return Status::mIOError;
+            return Statustype::IOError();
         }
 
         if((header_.ucFlag!=PROTOCALHEADERFLAG)||(header_.usVer!=PROTOCALVERSION))
@@ -263,18 +246,12 @@ public:
 
         std::memcpy(buf_+header_.usLength-8,&ulCrc32_,8);
 
-        if(std::strcmp(CrcGenCheck(),&ulCrc32_,8)!=Status::mOk)
-        {
-            LogError("crc query failed");
-        }
-
-        return Status::mOk;
+        return Statustype::Ok();
     }
-
-    void SetFd(int fd)
+    int CrcCheck()
     {
-        assert(fd<0);
-        fd_=fd;
+        size_t tmp=CrcGenCheck();
+        return memcmp(&tmp,&ulCrc32_,8);
     }
 
 private:
@@ -292,10 +269,10 @@ private:
         }
         try{
             buf_=new unsigned char[header_.usLength];
-        }catch(buf_)
+        }catch(...)
         {
             LogError("new buf failed len: %u\n",header_.usLength);
-            throw "Protocal new char failed!"
+            throw "Protocal new char failed!";
         }
         buflen_=header_.usLength;
 
@@ -324,88 +301,9 @@ private:
     uint16_t buflen_;
     size_t ulCrc32_;
 
-    int fd_;
     static atomic_uint sendseq_;
     static atomic_uint recvseq_;
 };
 
-class SerialBuffer()
-{
-public:
-    SerialBuffer():
-    pos_begin_(-1),
-    pos_end_(-1),
-    buflen_(50)
-    {
-        vecbuffer_.reserve(buflen_);
-    }
-    SerialBuffer(uint32_t len):
-    pos_begin_(-1),
-    pos_end_(-1),
-    buflen_(len)
-    {
-        vecbuffer_.reserve(len);
-    }
-
-    void push();
-
-    int pop()
-    {
-       return BufferPop();
-    }
-
-
-private:
-    Protocal* BufferPush()
-    {
-        pos_begin_++;
-        if(pos_begin_==buflen_)
-        {
-            pos_begin_=0;
-        }
-        if(pos_begin_==pos_end_) //buffer满了
-        {
-            return nullptr;
-        }
-
-        return p= &vecbuffer_[pos_begin_];
-    }
-
-    int BufferPop()
-    {
-        if(pos_begin_==pos_end_) //buffer空的
-        {
-            return -1;
-        }
-
-        int tmp=pos_end_;
-        tmp++;
-        if(tmp==buflen_)
-        {
-            tmp=0;
-        }
-
-        if(sendbuffer_[tmp].SendPkg()!=Status::mOk)
-        {
-            return Status::mIOError;
-        }
-
-        /*发送成功了才进一步 */
-        pos_end_=tmp;
-
-        return Status::mOk;
-    }
-
-private:
-
-    const uint16_t buflen_;
-
-    int pos_begin_;
-    int pos_end_;
-
-    std::vector<Protocal> vecbuffer_;
-};
-
-#define RSAENCRYPTBUFLEN 768 //128*6  STRUCTONPERLEN/86=6;
 
 #endif

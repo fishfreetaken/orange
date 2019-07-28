@@ -6,6 +6,7 @@
 #include <list>
 #include <vector>
 #include <utility>
+#include <queue>
 #define EPOLLMAXEVENTS 1024
 #define READBUFFLENMAX 512
 
@@ -54,11 +55,6 @@ private:
 class timeevent {
 
 public:
-
-    int TimeEventProc(std::vector<int> &m); //返回处理的fd个数，将过期的fd返回通知，并从事件map中进行取消注册，不再进行轮训
-
-    int TimeEventUpdate(size_t milliseconds,int fd); //对于每个fd如果没有在map中的话，添加，如果在的话进行更新
-
     int TimeEventUpdateLRU(size_t milliseconds,int fd);
     int TimeEventProc();
 
@@ -66,8 +62,10 @@ public:
     int TimeEventRemove(int tfd);
     void TimeEventAdd(int fd,size_t milisecond );
 
+    int TimeEventProc(epollhandlebase *base);
+
 private :
-    int TimeExceedJudge(struct timeval &a,struct timeval &b);
+   static  int TimeExceedJudge(struct timeval &a,struct timeval &b);
     void TimeShow(struct timeval &tv);
 private :
     //std::map<int,struct timeval> ump_;
@@ -78,16 +76,20 @@ private :
     struct basetimer {
         int fd;
         struct timeval v;
-        bool operator<(struct basetimer&a,struct basetimer&b)
+    };
+
+    class basetimecmp{
+    public:
+        bool operator () (struct basetimer&a, struct basetimer&b)
         {
-            if(TimeExceedJudge(a.v,b.v))
+            if(timeevent::TimeExceedJudge(a.v,b.v))
             {
                 return true;
             }
             return false;
         }
     };
-
-    std::priority_queue<struct basetimer> pri_;
+    
+    std::priority_queue <struct basetimer, std::vector<struct basetimer> , basetimecmp > pri_;
 };
 

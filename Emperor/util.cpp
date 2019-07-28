@@ -136,7 +136,7 @@ int tcpGenericConnect(const char *source_addr,int port,const char *dest_ip,int d
     }
 
     LogRecord("client connect success dest_ip:%s dest_port:%d",dest_ip,dest_port);
-    setNonBlock(fd_);
+    setNonBlock(socket_fd);
     goto end;
 
 error:

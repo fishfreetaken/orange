@@ -6,7 +6,7 @@
 #include <openssl/rand.h>
 
 /*低版本不支持一些特性 */
-#define OPENSSLOLDVERSION
+//#define OPENSSLOLDVERSION
 
 //#define PASSWORDKEY "12345678"
 #define PASSWORDKEY "donggeshidalao"
@@ -65,9 +65,16 @@ error:
     return Status::mCorruption;
 }
 
-Aescrypt::Aescrypt(char *c,uint32_t len):
-aeskey_.assign(c,len)
+Aescrypt::Aescrypt(char *c,uint32_t len)
 {
+    aeskey_.assign(c,len);
+    std::memset(iv_,0,MAX_BLOCK_SIZE);
+    sprintf((char*)iv_,"jofjwoiiewi23");
+}
+
+void Aescrypt::AesKeyGen(PersonalInfo &f)
+{
+    
 }
 
 int Aescrypt::Encrypt(const unsigned char* data,size_t datalen,unsigned char *out )
@@ -85,7 +92,7 @@ int Aescrypt::Encrypt(const unsigned char* data,size_t datalen,unsigned char *ou
 
     AES_KEY aes_ks3;
 
-    AES_set_encrypt_key((unsigned char*)aeskey_.c_str(), aeskeylen_, &aes_ks3);
+    AES_set_encrypt_key((unsigned char*)aeskey_.c_str(), aeskey_.size(), &aes_ks3);
     size_t cutup= datalen/AES_BLOCK_SIZE;
     size_t minus= datalen%AES_BLOCK_SIZE;
     size_t i =0;
@@ -114,10 +121,10 @@ int Aescrypt::Decrypt(const unsigned char* encryptData, size_t encryptlen,unsign
         return Status::mInvalidArgument;
     }
     AES_KEY aes_ksd3;
-    AES_set_decrypt_key((unsigned char*)aeskey_.c_str(), aeskeylen_, &aes_ksd3);
+    AES_set_decrypt_key((unsigned char*)aeskey_.c_str(), aeskey_.size(), &aes_ksd3);
 
-    size_t cutup= encryptData_len/AES_BLOCK_SIZE;
-    size_t minus= encryptData_len%AES_BLOCK_SIZE;
+    size_t cutup= encryptlen/AES_BLOCK_SIZE;
+    size_t minus= encryptlen%AES_BLOCK_SIZE;
     size_t i =0;
     for(i=0;i < cutup; i++)
     {
@@ -129,6 +136,14 @@ int Aescrypt::Decrypt(const unsigned char* encryptData, size_t encryptlen,unsign
     }
 
     return Status::mOk;
+}
+
+void Aescrypt::AESGenEnCryptKey(unsigned char *out,int ctl)
+{
+    int ret=RAND_bytes(out, ctl);
+    aeskey_.assign((char*)out,ctl);
+    LogError("rand generate aes failed %d %d",ret,ctl);
+    assert(ret<=0);
 }
 
 
